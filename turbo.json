@@ -1,21 +1,62 @@
 {
-  "$schema": "https://turborepo.com/schema.json",
-  "ui": "tui",
+  "$schema": "https://turbo.build/schema.json",
+
+  "globalDependencies": [
+    "**/.env.*local",
+    "package.json",
+    "turbo.json",
+    "eslintrc.js",
+    "packages/eslint-config/**"
+  ],
+
+  "globalEnv": [
+    "NODE_ENV",
+    "AWS_REGION",
+    "AWS_ACCOUNT_ID",
+    "DATABASE_URL",
+    "REDIS_URL",
+    "COGNITO_POOL_ID",
+    "COGNITO_CLIENT_ID"
+  ],
+
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "outputs": ["dist/**", ".next/**", "build/**"],
+
+      "env": ["NODE_ENV"]
     },
-    "lint": {
-      "dependsOn": ["^lint"]
-    },
-    "check-types": {
-      "dependsOn": ["^check-types"]
-    },
+
     "dev": {
       "cache": false,
       "persistent": true
+    },
+
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"],
+      "env": ["NODE_ENV"]
+    },
+
+    "lint": {
+      "outputs": []
+    },
+
+    "type-check": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+
+    "deploy": {
+      "dependsOn": ["build", "test"],
+      "outputs": [],
+      "env": ["AWS_REGION", "AWS_ACCOUNT_ID", "CI", "GIT_COMMIT_SHA"]
+    },
+
+    "infra:*": {
+      "cache": false,
+      "dependsOn": [],
+      "env": ["CDK_DEFAULT_ACCOUNT", "CDK_DEFAULT_REGION", "AWS_PROFILE"]
     }
   }
 }

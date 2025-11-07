@@ -1,79 +1,82 @@
-import js from "@eslint/js";
-import eslintConfigPrettier from "eslint-config-prettier";
-import turboPlugin from "eslint-plugin-turbo";
-import tseslint from "typescript-eslint";
-import onlyWarn from "eslint-plugin-only-warn";
-// Ajout des plugins "promise" et "import" de votre ancienne configuration
-import importPlugin from "eslint-plugin-import";
+import js from '@eslint/js';
+import eslintConfigPrettier from 'eslint-config-prettier';
+import turboPlugin from 'eslint-plugin-turbo';
+import tseslint from 'typescript-eslint';
+import onlyWarn from 'eslint-plugin-only-warn';
+// Adds "promise" and "import" plugins from your previous configuration
+import importPlugin from 'eslint-plugin-import';
 
 /**
- * Configuration ESLint de base partagée pour le monorepo.
- * Fusionne les règles du Monorepo par défaut et les préférences personnelles.
+ * Shared base ESLint configuration for the monorepo.
+ * Merges default monorepo rules with personal preferences.
  *
  * @type {import("eslint").Linter.Config[]}
  * */
 export const config = [
-  // 1. Règles de base JavaScript recommandées
+  // 1. Recommended base JavaScript rules
   js.configs.recommended,
-  
-  // 2. Règles TypeScript recommandées
+
+  // 2. Recommended TypeScript rules
   ...tseslint.configs.recommended,
-  
-  // 3. Désactive toutes les règles qui entrent en conflit avec Prettier (doit être après tous les autres)
+
+  // 3. Disables all rules that conflict with Prettier (must be after all others)
   eslintConfigPrettier,
-  
-  // 4. Intégration Turborepo et règles de monorepo personnalisées
+
+  // 4. Turborepo integration and custom monorepo rules
   {
     plugins: {
       turbo: turboPlugin,
-      // Ajout des plugins "promise" et "import" dans le nouveau format
-      import: importPlugin, 
+      // Adds "promise" and "import" plugins in the new format
+      import: importPlugin,
     },
     rules: {
-      // --- Règles de Turborepo ---
-      "turbo/no-undeclared-env-vars": "warn",
+      // --- Turborepo Rules ---
+      'turbo/no-undeclared-env-vars': 'warn',
 
-      // --- Règles TypeScript Personnelles Fusionnées ---
-      // Désactive l'exigence de types explicites sur les exports (pour plus de flexibilité)
-      "@typescript-eslint/explicit-module-boundary-types": "off", 
-      // Autorise l'utilisation de 'any' pour la flexibilité (souvent nécessaire pour les utilitaires monorepo)
-      "@typescript-eslint/no-explicit-any": "off", 
-      
-      // --- Règles d'Importation Personnelles Fusionnées ---
-      // Désactive la vérification des dépendances externes (crucial dans un monorepo)
-      "import/no-extraneous-dependencies": "off", 
-      
-      // Force un ordre d'importation cohérent (très professionnelle)
-      "import/order": ["error", {
-        "groups": ["builtin", "external", "internal", "parent", "sibling", "index"],
-        "newlines-between": "always"
-      }],
-      
-      // Préfère la flexibilité des exports nommés plutôt que de forcer les exports par défaut
-      "import/prefer-default-export": "off", 
+      // --- Merged Personal TypeScript Rules ---
+      // Disables the requirement for explicit types on exports (for flexibility)
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+      // Allows the use of 'any' for flexibility (often needed for monorepo utilities)
+      '@typescript-eslint/no-explicit-any': 'off',
+
+      // --- Merged Personal Import Rules ---
+      // Disables checking for external dependencies (crucial in a monorepo)
+      'import/no-extraneous-dependencies': 'off',
+
+      // Enforces a consistent import order (highly professional)
+      'import/order': [
+        'error',
+        {
+          groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
+          'newlines-between': 'always',
+        },
+      ],
+
+      // Prefers the flexibility of named exports over forcing default exports
+      'import/prefer-default-export': 'off',
     },
   },
-  
-  // 5. Plugin pour traiter toutes les erreurs comme des avertissements (optionnel, mais courant en CI)
+
+  // 5. Plugin to treat all errors as warnings (optional, but common in CI)
   {
     plugins: {
       onlyWarn,
     },
   },
 
-  // 6. Configuration de l'environnement Node.js (tirée de votre ancienne config)
+  // 6. Node.js environment configuration (taken from your old config)
   {
     languageOptions: {
       globals: {
-        // Définit l'environnement comme Node.js (pour les microservices)
+        // Defines the environment as Node.js (for microservices)
         node: true,
       },
     },
   },
-  
-  // 7. Fichiers à ignorer
+
+  // 7. Ignored files
   {
-    // Ignore les répertoires de compilation
-    ignores: ["dist/**"],
+    // Ignores build directories
+    ignores: ['dist/**'],
   },
 ];

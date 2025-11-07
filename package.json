@@ -1,24 +1,68 @@
 {
   "name": "feature-flags-platform",
   "private": true,
-  "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev",
-    "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types"
+  "version": "1.0.0",
+  "description": "Feature flags platform - monorepo with Turborepo, NestJS, Next.js, and AWS CDK infrastructure.",
+  "author": "FonouTS",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
   },
-  "devDependencies": {
-    "prettier": "^3.6.2",
-    "turbo": "^2.6.0",
-    "typescript": "5.9.2"
-  },
-  "engines": {
-    "node": ">=18"
-  },
-  "packageManager": "npm@11.6.2",
   "workspaces": [
     "apps/*",
-    "packages/*"
-  ]
+    "packages/*",
+    "infrastructure"
+  ],
+  "scripts": {
+    "// ---- DEV ----": "",
+    "dev": "turbo run dev --parallel",
+    "dev:api": "turbo run dev --filter=api-*^",
+    "dev:dashboard": "turbo run dev --filter=dashboard",
+    "// ---- BUILD & TEST ----": "",
+    "build": "turbo run build",
+    "test": "turbo run test --parallel",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "prepare": "husky install",
+    "// ---- DOCKER LOCAL ----": "",
+    "docker:up": "docker compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f docker/docker-compose.yml down",
+    "docker:rebuild": "docker compose -f docker/docker-compose.yml up -d --build",
+    "// ---- INFRA (AWS CDK) ----": "",
+    "infra:bootstrap": "cd infrastructure && cdk bootstrap",
+    "infra:synth": "cd infrastructure && cdk synth",
+    "infra:deploy": "cd infrastructure && cdk deploy --all --require-approval never",
+    "infra:destroy": "cd infrastructure && cdk destroy --force",
+    "infra:diff": "cd infrastructure && cdk diff",
+    "// ---- CI/CD ----": "",
+    "ci:check": "turbo run lint test build",
+    "ci:deploy": "npm run infra:deploy",
+    "// ---- UTIL ----": "",
+    "clean": "rm -rf node_modules && rm -rf apps/*/node_modules && rm -rf packages/*/node_modules && rm -rf .turbo"
+  },
+  "devDependencies": {
+    "@turbo/gen": "^1.11.0",
+    "aws-cdk-lib": "^2.154.0",
+    "constructs": "^10.3.0",
+    "dotenv-cli": "^7.3.0",
+    "eslint": "^9.38.0",
+    "eslint-config-prettier": "^10.1.1",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0",
+    "prettier": "^3.1.0",
+    "turbo": "^2.6.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "packageManager": "npm@11.6.2",
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,json,md}": [
+      "prettier --write",
+      "eslint --fix"
+    ]
+  }
 }

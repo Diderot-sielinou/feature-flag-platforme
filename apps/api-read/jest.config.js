@@ -1,10 +1,10 @@
 const { pathsToModuleNameMapper } = require('ts-jest');
 
-const { compilerOptions } = require('../../tsconfig.base.json'); // ✅ Corrigé : bon chemin vers le fichier racine
+const { compilerOptions } = require('../../tsconfig.base.json');
 
 module.exports = {
   preset: 'ts-jest',
-  rootDir: '../..', // ✅ Important pour que Jest résolve les chemins correctement
+  rootDir: '../..',
   testEnvironment: 'node',
   moduleFileExtensions: ['ts', 'js', 'json'],
   transform: {
@@ -13,10 +13,10 @@ module.exports = {
   testMatch: ['**/*.spec.ts'],
   globals: {
     'ts-jest': {
-      tsconfig: '<rootDir>/apps/api-management/tsconfig.json', // ✅ Bon chemin absolu
+      tsconfig: '<rootDir>/apps/api-management/tsconfig.json',
     },
   },
   moduleNameMapper: pathsToModuleNameMapper(compilerOptions.paths || {}, {
-    prefix: '<rootDir>/', // ✅ Résolution propre depuis la racine du repo
+    prefix: '<rootDir>/',
   }),
 };

@@ -1,31 +1,31 @@
-// import { nestjsConfig } from "@repo/eslint-config/nestjs.js";
-
-// export default [...nestjsConfig];
-import { nestjsConfig } from "@repo/eslint-config/nestjs.js";
+import { nestjsConfig } from '@repo/eslint-config/nestjs.js';
 
 /**
- * Configuration ESLint pour l’app NestJS `api-management`
- * 
- * ✅ Étend la configuration partagée du package @repo/eslint-config
- * ✅ Compatible avec CommonJS
- * ✅ Intègre les bonnes règles TypeScript & Jest
- */
+
+* ESLint configuration for the NestJS `api-management` app
+
+* ✅ Extends the shared configuration of the @repo/eslint-config package
+
+* ✅ Compatible with CommonJS
+
+* ✅ Integrates proper TypeScript & Jest rules
+
+*/
 
 export default [
   ...nestjsConfig,
   {
-    files: ["src/**/*.ts"],
+    files: ['src/**/*.ts'],
     languageOptions: {
       parserOptions: {
-        project: "./tsconfig.json",
+        project: './tsconfig.json',
         tsconfigRootDir: import.meta.dirname,
       },
     },
     rules: {
-      // ✅ Quelques règles personnalisées possibles ici
-      "@typescript-eslint/no-floating-promises": "warn",
-      "@typescript-eslint/explicit-function-return-type": "off",
-      "@typescript-eslint/no-explicit-any": "off",
+      '@typescript-eslint/no-floating-promises': 'warn',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 ];

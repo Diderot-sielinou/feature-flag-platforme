@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  cognitoId String    @unique
+  email     String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  projects   Project[]
+  auditLogs  AuditLog[]
+
+  @@map("users")
+}
+
+model Project {
+  id           String        @id @default(cuid())
+  name         String
+  ownerId      String
+  owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  environments Environment[]
+  flags        Flag[]
+  entities     Entity[]
+  auditLogs    AuditLog[]
+
+  @@index([ownerId])
+  @@map("projects")
+}
+
+model Environment {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  apiKey      String   @unique
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  flagStates  FlagEnvironmentState[]
+
+  @@unique([projectId, name])
+  @@index([projectId])
+  @@map("environments")
+}
+
+model Flag {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  description String?  @db.Text
+  tags        String[]
+  owner       String?
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  states      FlagEnvironmentState[]
+
+  @@unique([projectId, name])
+  @@index([projectId])
+  @@map("flags")
+}
+
+model FlagEnvironmentState {
+  id           String   @id @default(cuid())
+  flagId       String
+  flag         Flag     @relation(fields: [flagId], references: [id], onDelete: Cascade)
+  envId        String
+  environment  Environment @relation(fields: [envId], references: [id], onDelete: Cascade)
+  defaultState Boolean  @default(false)
+  rules        Json
+  version      Int      @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([flagId, envId])
+  @@index([flagId])
+  @@map("flag_environment_states")
+}
+
+model Entity {
+  id         String   @id
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type       String
+  attributes Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([projectId])
+  @@map("entities")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actorId     String
+  actor       User     @relation(fields: [actorId], references: [id])
+  actorType   String   @default("user")
+  action      String
+  targetType  String
+  targetId    String
+  payload     Json
+  createdAt   DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@map("audit_logs")
+}

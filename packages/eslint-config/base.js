@@ -29,6 +29,18 @@ export const config = [
       // Adds "promise" and "import" plugins in the new format
       import: importPlugin,
     },
+    settings: {
+      // Allows ESLint to understand TypeScript aliases (@repo/*, @apps/*))
+      'import/resolver': {
+        typescript: {
+          project: ['./tsconfig.base.json', './apps/*/tsconfig.json', './packages/*/tsconfig.json'],
+        },
+        node: {
+          extensions: ['.js', '.jsx', '.ts', '.tsx'],
+        },
+      },
+    },
+
     rules: {
       // --- Turborepo Rules ---
       'turbo/no-undeclared-env-vars': 'warn',

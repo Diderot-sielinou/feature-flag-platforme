@@ -1,0 +1,24 @@
+{
+  "extends": "../../packages/typescript-config/nestjs.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "types": ["node", "jest"],
+    "module": "commonjs", // ✅ NestJS utilise CommonJS
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2021",
+    "lib": ["ES2021"],
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "removeComments": false,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "strictPropertyInitialization": false
+  },
+  // ✅ On inclut aussi les fichiers de test pour qu’ESLint/Jest puissent les lire
+  "include": ["src/**/*", "src/**/*.spec.ts", "src/**/*.test.ts"],
+  "exclude": ["node_modules", "dist"]
+}

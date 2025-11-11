@@ -5,7 +5,6 @@
   "description": "Feature flags platform - monorepo with Turborepo, NestJS, Next.js, and AWS CDK infrastructure.",
   "author": "FonouTS",
   "license": "MIT",
-  "type": "module",
   "repository": {
     "type": "git",
     "url": ""
@@ -43,14 +42,16 @@
     "clean": "rm -rf node_modules && rm -rf apps/*/node_modules && rm -rf packages/*/node_modules && rm -rf .turbo"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
     "@turbo/gen": "^1.11.0",
     "@typescript-eslint/eslint-plugin": "^8.46.3",
     "@typescript-eslint/parser": "^8.46.3",
     "aws-cdk-lib": "^2.154.0",
     "constructs": "^10.3.0",
     "dotenv-cli": "^7.3.0",
-    "eslint": "^9.38.0",
-    "eslint-config-prettier": "^10.1.1",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react": "^7.37.5",
@@ -61,7 +62,8 @@
     "lint-staged": "^15.0.0",
     "prettier": "^3.1.0",
     "turbo": "^2.6.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "typescript-eslint": "^8.46.3"
   },
   "engines": {
     "node": ">=18.0.0",

@@ -12,7 +12,7 @@ import { config as baseConfig } from './base.js';
  *
  * @type {import("eslint").Linter.Config[]} */
 // packages/eslint-config/react-internal.js
-export const reactInternalConfig = [
+export const config = [
   ...baseConfig,
   js.configs.recommended,
   eslintConfigPrettier,

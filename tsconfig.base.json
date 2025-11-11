@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "allowJs": false,
+    "baseUrl": ".",
+    "paths": {
+      "@repo/*": ["packages/*/src"],
+      "@apps/*": ["apps/*/src"],
+      "@app/*": ["apps/*/src"]
+    },
+    "outDir": "dist"
+  },
+  "include": [],
+  "exclude": ["node_modules", "dist"]
+}

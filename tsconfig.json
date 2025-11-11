@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    // Utilisez une sortie commune pour tous les projets
+    "outDir": "./dist"
+  },
+  "include": [
+    // Inclure tous les fichiers source des apps
+    "apps/*/src/**/*",
+    // Inclure tous les fichiers source des packages
+    "packages/*/src/**/*",
+    // Inclure les fichiers de configuration principaux
+    "eslint.config.js",
+    "turbo.json",
+    "package.json",
+    "jest.config.js",
+    "apps/**/*.ts",
+    "apps/**/*.tsx",
+    "packages/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts", "**/node_modules", "**/dist"]
+}

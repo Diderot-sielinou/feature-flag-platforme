@@ -6,7 +6,10 @@
   "exports": {
     "./base": "./base.js",
     "./next-js": "./next.js",
-    "./react-internal": "./react-internal.js"
+    "./react-internal": "./react-internal.js",
+    ".": "./base.js",
+    "./nestjs.js": "./nestjs.js",
+    "./nextjs-app.js": "./nextjs-app.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",

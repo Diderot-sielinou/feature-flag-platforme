@@ -16,7 +16,8 @@
     "DATABASE_URL",
     "REDIS_URL",
     "COGNITO_POOL_ID",
-    "COGNITO_CLIENT_ID"
+    "COGNITO_CLIENT_ID",
+    "PORT"
   ],
 
   "tasks": {

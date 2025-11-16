@@ -15,7 +15,7 @@ import { DashboardStack } from '../lib/dashboard-stack';
 import { DocumentationStack } from '../lib/documentation-stack';
 
 // CI/CD
-import { PipelineStack } from '../lib/pipeline-stack';
+// import { PipelineStack } from '../lib/pipeline-stack';
 
 // -------------------------------------------------------
 // App & Environment
@@ -120,18 +120,18 @@ monitoringStack.addDependency(computeStack);
 // -------------------------------------------------------
 // 9. CI/CD Pipeline (GitHub → ECR → ECS Blue/Green)
 // -------------------------------------------------------
-const pipelineStack = new PipelineStack(app, 'FeatureFlagsPipelineStack', {
-  env,
-  repositoryOwner: 'fonou-diderot',
-  repositoryName: 'feature-flags-platform',
-  branch: 'main',
-  githubTokenSecretArn: 'arn:aws:secretsmanager:us-east-1:123456789012:secret:github-token-xxxxx', // remplis avec ton ARN
-  managementEcr: computeStack.managementEcr,
-  readEcr: computeStack.readEcr,
-  managementService: computeStack.managementService,
-  readService: computeStack.readService,
-});
-pipelineStack.addDependency(computeStack);
+// const pipelineStack = new PipelineStack(app, 'FeatureFlagsPipelineStack', {
+//   env,
+//   repositoryOwner: 'Diderot-sielinou',
+//   repositoryName: 'feature-flag-platforme',
+//   branch: 'main',
+//   githubTokenSecretArn: 'arn:aws:secretsmanager:us-east-1:269417790119:secret:github-token-sZejvd',
+//   managementEcr: computeStack.managementEcr,
+//   readEcr: computeStack.readEcr,
+//   managementService: computeStack.managementService,
+//   readService: computeStack.readService,
+// });
+// pipelineStack.addDependency(computeStack);
 
 // -------------------------------------------------------
 // Tags for all resources

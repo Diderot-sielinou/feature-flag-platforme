@@ -201,14 +201,22 @@ export class ComputeStack extends cdk.Stack {
 
     // Environment variables
     // *** CHANGEMENT: Supprimer REDIS_HOST et REDIS_PORT, ajouter les variables de messagerie ***
+    // Environment variables
     const commonEnv = {
       NODE_ENV: 'production',
       AWS_REGION: cdk.Aws.REGION,
-      REDIS_HOST: props.redisEndpoint, //
-      REDIS_PORT: '6379', //
+
+      // ---- REDIS (corrigé pour TLS) ----
+      REDIS_HOST: props.redisEndpoint,
+      REDIS_PORT: '6379',
+      REDIS_TLS: 'true', // <<< important pour redis avec transitEncryptionEnabled
+      REDIS_URL: `rediss://${props.redisEndpoint}:6379`, // <<< connexion complète via TLS
+
+      // Cognito
       COGNITO_USER_POOL_ID: props.userPoolId,
       COGNITO_CLIENT_ID: props.userPoolClientId,
-      // Ajouter les variables pour la messagerie
+
+      // Messaging
       EVENT_BUS_NAME: props.eventBusName,
       FLAG_TOPIC_ARN: props.flagTopicArn,
       READ_QUEUE_URL: props.readQueueUrl,
@@ -226,7 +234,7 @@ export class ComputeStack extends cdk.Stack {
     };
 
     // Container Definitions
-    managementTaskDef.addContainer('ManagementContainer', {
+    managementTaskDef.addContainer('management-service', {
       image: ecs.ContainerImage.fromEcrRepository(managementRepo, 'latest'),
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'management',
@@ -243,7 +251,7 @@ export class ComputeStack extends cdk.Stack {
       },
     });
 
-    readTaskDef.addContainer('ReadContainer', {
+    readTaskDef.addContainer('read-service', {
       image: ecs.ContainerImage.fromEcrRepository(readRepo, 'latest'),
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'read',

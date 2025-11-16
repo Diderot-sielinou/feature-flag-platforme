@@ -131,6 +131,9 @@ export class PipelineStack extends cdk.Stack {
           'ecs:DescribeTaskDefinition',
           'ecs:RegisterTaskDefinition',
           'iam:PassRole',
+          'ecr:GetDownloadUrlForLayer',
+          'ecr:BatchGetImage',
+          'ecr:GetAuthorizationToken',
         ],
         resources: ['*'], // scope down if you want (cluster/service ARNs)
       }),

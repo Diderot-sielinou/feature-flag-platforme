@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ff-postgres
+    environment:
+      POSTGRES_USER: ffuser
+      POSTGRES_PASSWORD: ffpassword
+      POSTGRES_DB: featureflags
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ffuser']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ff-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: ff-redis
+    ports:
+      - '6379:6379'
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ff-network
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: ff-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - '8081:8081'
+    depends_on:
+      - redis
+    networks:
+      - ff-network
+
+  # API Management (local build)
+  api-management:
+    build:
+      context: ..
+      dockerfile: docker/api-management.Dockerfile
+    container_name: ff-api-management
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://ffuser:ffpassword@postgres:5432/featureflags?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID}
+      COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      JWT_SECRET: dev-secret-change-in-production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ff-network
+    restart: unless-stopped
+
+  # API Read (local build)
+  api-read:
+    build:
+      context: ..
+      dockerfile: docker/api-read.Dockerfile
+    container_name: ff-api-read
+    ports:
+      - '3001:3001'
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - ff-network
+    restart: unless-stopped
+    # Optionnel pour tester le load balancing local
+    # deploy:
+    #   replicas: 2
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  ff-network:
+    driver: bridge

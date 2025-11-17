@@ -111,6 +111,13 @@ jobs:
     needs: build-images
     if: github.ref == 'refs/heads/main'
 
+    env:
+      DB_SECRET_ARN: ${{ secrets.DB_SECRET_ARN }}
+      RDS_ENDPOINT: ${{ secrets.RDS_ENDPOINT }} # Utilisez vars. ou secrets. selon où vous le stockez
+      VPC_SUBNET_IDS: ${{ secrets.VPC_SUBNET_IDS }}
+      APP_SECURITY_GROUP_ID: ${{ secrets.APP_SECURITY_GROUP_ID }}
+      AWS_REGION: us-east-1
+
     steps:
       - uses: actions/checkout@v4
 
@@ -119,11 +126,109 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Update ECS services
+      # --------------------------------------------------
+      # PHASE 1 : Préparation de la Migration
+      # --------------------------------------------------
+      - name: Retrieve DB Credentials from Secret Manager
+        id: db-credentials
         run: |
+          # Récupère le JSON du secret
+          SECRET_JSON=$(aws secretsmanager get-secret-value \
+            --secret-id "${{ env.DB_SECRET_ARN }}" \
+            --query SecretString \
+            --output text)
+            
+          # Extrait l'utilisateur et le mot de passe
+          USERNAME=$(echo $SECRET_JSON | jq -r '.username')
+          PASSWORD=$(echo $SECRET_JSON | jq -r '.password')
+          DBNAME="featureflags" # Nom de base de données défini dans la stack
+          PORT="5432"
+
+          # Construit le DATABASE_URL complet
+          DATABASE_URL="postgresql://${USERNAME}:${PASSWORD}@${{ env.RDS_ENDPOINT }}:${PORT}/${DBNAME}?schema=public"
+
+          # Exporte le DATABASE_URL pour l'utiliser dans les étapes suivantes
+          echo "DATABASE_URL=$DATABASE_URL" >> $GITHUB_ENV
+          echo "Migration URL construite avec succès."
+        shell: bash
+        # NÉCESSITE LE PACKAGE `jq` pour traiter le JSON (installé par défaut sur Ubuntu-latest)
+
+      # --------------------------------------------------
+      # PHASE 2 : Exécution de la Migration via Tâche ECS
+      # --------------------------------------------------
+      - name: Run Prisma Migration on RDS using Fargate Task
+        id: migration-task
+        run: |
+          # Le nom de la Task Definition est le nom de la Stack + le nom de la ressource.
+          # Nous utiliserons le ManagementService Task Definition comme template.
+          TASK_DEF_FAMILY="FeatureFlagsComputeStack-ManagementTaskDefinition"
+
+          echo "Lancement de la migration Fargate..."
+
+          # 1. Lancer la tâche Fargate de migration
+          TASK_ARN=$(aws ecs run-task \
+            --cluster feature-flags-cluster \
+            --task-definition ${TASK_DEF_FAMILY} \
+            --launch-type FARGATE \
+            --count 1 \
+            --platform-version LATEST \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ env.VPC_SUBNET_IDS }}],securityGroups=[${{ env.APP_SECURITY_GROUP_ID }}],assignPublicIp=DISABLED}" \
+            --overrides '{
+                "containerOverrides": [
+                    {
+                        "name": "management-service", 
+                        "command": ["sh", "-c", "npm install && npm --workspace=@repo/database run db:migrate:prod"], 
+                        "environment": [
+                            {"name": "DATABASE_URL", "value": "${{ env.DATABASE_URL }}"}
+                        ]
+                    }
+                ]
+            }' \
+            --query 'tasks[0].taskArn' \
+            --output text)
+
+          if [ "$TASK_ARN" == "None" ] || [ -z "$TASK_ARN" ]; then
+            echo "::error::Échec du lancement de la tâche de migration ECS."
+            exit 1
+          fi
+
+          echo "Tâche de migration $TASK_ARN lancée."
+
+          # 2. Attendre que la tâche se termine (succès ou échec)
+          # Utilisation de la commande 'wait' ECS
+          aws ecs wait tasks-stopped \
+            --cluster feature-flags-cluster \
+            --tasks $TASK_ARN
+            
+          # 3. Vérifier le statut d'arrêt
+          TASK_STATUS=$(aws ecs describe-tasks \
+            --cluster feature-flags-cluster \
+            --tasks $TASK_ARN \
+            --query 'tasks[0].stoppedReason' \
+            --output text)
+
+          if [[ "$TASK_STATUS" == "Essential container in task exited" ]]; then
+              echo "::error::La migration a échoué. Cause: $TASK_STATUS. Vérifiez les logs de la tâche $TASK_ARN."
+              exit 1
+          fi
+
+          echo "🎉 Migration de base de données terminée avec succès."
+        shell: bash
+
+      # --------------------------------------------------
+      # PHASE 3 : Déploiement des Services API
+      # --------------------------------------------------
+      - name: Deploy new images to ECS
+        run: |
+          # Les services ECS peuvent maintenant démarrer avec la certitude que 
+          # le schéma de la base de données est à jour.
+
           aws ecs update-service --cluster feature-flags-cluster \
-            --service management-service --force-new-deployment
+            --service ManagementService --force-new-deployment
+
           aws ecs update-service --cluster feature-flags-cluster \
-            --service read-service --force-new-deployment
+            --service ReadService --force-new-deployment
+
+          echo "🚀 Déploiement ECS forcé déclenché pour les deux services."

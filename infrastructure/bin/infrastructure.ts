@@ -11,8 +11,8 @@ import { ComputeStack } from '../lib/compute-stack';
 import { MonitoringStack } from '../lib/monitoring-stack';
 
 // Frontends
-import { DashboardStack } from '../lib/dashboard-stack';
-import { DocumentationStack } from '../lib/documentation-stack';
+// import { DashboardStack } from '../lib/dashboard-stack';
+// import { DocumentationStack } from '../lib/documentation-stack';
 
 // CI/CD
 // import { PipelineStack } from '../lib/pipeline-stack';
@@ -63,6 +63,7 @@ const computeStack = new ComputeStack(app, 'FeatureFlagsComputeStack', {
   env,
   vpc: networkStack.vpc,
   applicationSecurityGroup: networkStack.applicationSecurityGroup,
+  albSecurityGroup: networkStack.albSecurityGroup,
 
   dbSecret: databaseStack.dbSecret,
   dbEndpoint: databaseStack.dbInstance.dbInstanceEndpointAddress,
@@ -84,25 +85,25 @@ computeStack.addDependency(messagingStack);
 // -------------------------------------------------------
 // 6. Dashboard (Next.js → S3 + CloudFront)
 // -------------------------------------------------------
-const dashboardStack = new DashboardStack(app, 'FeatureFlagsDashboardStack', {
-  env,
-  apiManagementBaseUrl: `https://${computeStack.alb.loadBalancerDnsName}`,
-  // domainName: "dashboard.yourcompany.com",
-  // certificateArn: "arn:aws:acm:…",
-  // hostedZoneId: "Zxxxx",
-});
+// const dashboardStack = new DashboardStack(app, 'FeatureFlagsDashboardStack', {
+//   env,
+//   apiManagementBaseUrl: `https://${computeStack.alb.loadBalancerDnsName}`,
+//   // domainName: "dashboard.yourcompany.com",
+//   // certificateArn: "arn:aws:acm:…",
+//   // hostedZoneId: "Zxxxx",
+// });
 
-dashboardStack.addDependency(computeStack);
+// dashboardStack.addDependency(computeStack);
 
 // -------------------------------------------------------
 // 7. Documentation (Docusaurus → S3 + CloudFront)
 // -------------------------------------------------------
-const documentationStack = new DocumentationStack(app, 'FeatureFlagsDocumentationStack', {
-  env,
-  // domainName: "docs.yourcompany.com",
-  // certificateArn: "arn:aws:acm:…",
-  // hostedZoneId: "Zxxxx",
-});
+// const documentationStack = new DocumentationStack(app, 'FeatureFlagsDocumentationStack', {
+//   env,
+//   // domainName: "docs.yourcompany.com",
+//   // certificateArn: "arn:aws:acm:…",
+//   // hostedZoneId: "Zxxxx",
+// });
 
 // -------------------------------------------------------
 // 8. Monitoring (CloudWatch alarms, dashboards)

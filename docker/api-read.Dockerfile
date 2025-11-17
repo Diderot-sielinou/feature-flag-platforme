@@ -23,6 +23,10 @@ RUN npm exec -- turbo run build --filter api-read # <--- CHANGEMENT: npm exec --
 # --- Étape de Production ---
 FROM node:20-alpine AS runner
 
+# Installer curl pour healthcheck
+RUN apk add --no-cache curl
+
+
 # Installer curl pour les health checks
 RUN apk add --no-cache curl
 

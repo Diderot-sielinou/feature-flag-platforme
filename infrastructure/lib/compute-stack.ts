@@ -18,6 +18,8 @@ interface ComputeStackProps extends cdk.StackProps {
   applicationSecurityGroup: ec2.SecurityGroup;
   dbSecret: secretsmanager.Secret;
   dbEndpoint: string;
+  albSecurityGroup: ec2.SecurityGroup;
+
   // *** CHANGEMENT: On n'utilise plus redisEndpoint ***
   redisEndpoint: string;
   userPoolId: string;
@@ -67,6 +69,7 @@ export class ComputeStack extends cdk.Stack {
     this.alb = new elbv2.ApplicationLoadBalancer(this, 'ALB', {
       vpc: props.vpc,
       internetFacing: true,
+      securityGroup: props.albSecurityGroup,
       vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
     });
 
@@ -105,9 +108,6 @@ export class ComputeStack extends cdk.Stack {
     const httpListener = this.alb.addListener('HTTPListener', {
       port: 80,
       protocol: elbv2.ApplicationProtocol.HTTP,
-      // certificates: [
-      //   // TODO: Add your ACM certificate ARN
-      // ],
       defaultAction: elbv2.ListenerAction.fixedResponse(404, {
         contentType: 'application/json',
         messageBody: JSON.stringify({ error: 'Not Found' }),
@@ -209,8 +209,8 @@ export class ComputeStack extends cdk.Stack {
       // ---- REDIS (corrigé pour TLS) ----
       REDIS_HOST: props.redisEndpoint,
       REDIS_PORT: '6379',
-      REDIS_TLS: 'true', // <<< important pour redis avec transitEncryptionEnabled
-      REDIS_URL: `rediss://${props.redisEndpoint}:6379`, // <<< connexion complète via TLS
+      REDIS_TLS: 'false',
+      REDIS_URL: `redis://${props.redisEndpoint}:6379`,
 
       // Cognito
       COGNITO_USER_POOL_ID: props.userPoolId,
@@ -226,6 +226,7 @@ export class ComputeStack extends cdk.Stack {
       ...commonEnv,
       DATABASE_URL: `postgresql://{{resolve:secretsmanager:${props.dbSecret.secretArn}:SecretString:username}}:{{resolve:secretsmanager:${props.dbSecret.secretArn}:SecretString:password}}@${props.dbEndpoint}:5432/featureflags`,
       PORT: '3000',
+      JWT: 'gtjgo',
     };
 
     const readEnv = {
@@ -235,7 +236,7 @@ export class ComputeStack extends cdk.Stack {
 
     // Container Definitions
     managementTaskDef.addContainer('management-service', {
-      image: ecs.ContainerImage.fromEcrRepository(managementRepo, 'latest'),
+      image: ecs.ContainerImage.fromRegistry('public.ecr.aws/docker/library/nginx:latest'),
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'management',
         logGroup: managementLogGroup,
@@ -252,7 +253,7 @@ export class ComputeStack extends cdk.Stack {
     });
 
     readTaskDef.addContainer('read-service', {
-      image: ecs.ContainerImage.fromEcrRepository(readRepo, 'latest'),
+      image: ecs.ContainerImage.fromRegistry('public.ecr.aws/docker/library/nginx:latest'),
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'read',
         logGroup: readLogGroup,

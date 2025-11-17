@@ -6,6 +6,8 @@ export class NetworkStack extends cdk.Stack {
   public readonly vpc: ec2.Vpc;
   public readonly applicationSecurityGroup: ec2.SecurityGroup;
   public readonly databaseSecurityGroup: ec2.SecurityGroup;
+  public readonly albSecurityGroup: ec2.SecurityGroup;
+
   public readonly cacheSecurityGroup: ec2.SecurityGroup;
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -81,6 +83,28 @@ export class NetworkStack extends cdk.Stack {
       this.applicationSecurityGroup,
       ec2.Port.tcp(6379),
       'Allow Redis access from application',
+    );
+
+    // new SG
+
+    // Security Group for ALB (to avoid dependency cycles)
+    this.albSecurityGroup = new ec2.SecurityGroup(this, 'ALBSG', {
+      vpc: this.vpc,
+      description: 'Security group for ALB',
+      allowAllOutbound: true,
+    });
+
+    // Allow ALB to reach application services
+    this.applicationSecurityGroup.addIngressRule(
+      this.albSecurityGroup,
+      ec2.Port.tcp(3000),
+      'Allow ALB to reach management service',
+    );
+
+    this.applicationSecurityGroup.addIngressRule(
+      this.albSecurityGroup,
+      ec2.Port.tcp(3001),
+      'Allow ALB to reach read service',
     );
 
     // Outputs

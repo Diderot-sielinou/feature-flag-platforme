@@ -1,13 +1,21 @@
-name: CI
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  CLUSTER_NAME: feature-flags-cluster
 
 jobs:
+  # ============================================
+  # JOB 1 : Tests & Linting
+  # ============================================
   test:
+    name: Tests & Quality Checks
     runs-on: ubuntu-latest
 
     services:
@@ -30,9 +38,10 @@ jobs:
           - 6379:6379
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Setup Node.js + npm
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -42,10 +51,14 @@ jobs:
         run: npm ci
 
       - name: Generate Prisma Client
-        run: cd packages/database && npm run db:generate
+        run: |
+          cd packages/database
+          npm run db:generate
 
-      - name: Run migrations
-        run: cd packages/database && npm run db:push
+      - name: Run migrations (test DB)
+        run: |
+          cd packages/database
+          npm run db:push
         env:
           DATABASE_URL: postgresql://ffuser:ffpassword@localhost:5432/featureflags
 
@@ -55,71 +68,31 @@ jobs:
       - name: Type check
         run: npm run type-check
 
-      - name: Build
+      - name: Build all packages
         run: npm run build
 
-      - name: Test
+      - name: Run tests
         run: npm run test
         env:
           DATABASE_URL: postgresql://ffuser:ffpassword@localhost:5432/featureflags
           REDIS_HOST: localhost
           REDIS_PORT: 6379
 
-  build-images:
+  # ============================================
+  # JOB 2 : Build & Push Docker Images
+  # ============================================
+  build-and-push:
+    name: Build & Push Docker Images
     runs-on: ubuntu-latest
     needs: test
     if: github.ref == 'refs/heads/main'
 
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and push Management API
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          docker build -t $ECR_REGISTRY/feature-flags/api-management:$IMAGE_TAG \
-            -t $ECR_REGISTRY/feature-flags/api-management:latest \
-            -f docker/api-management.Dockerfile .
-          docker push $ECR_REGISTRY/feature-flags/api-management:$IMAGE_TAG
-          docker push $ECR_REGISTRY/feature-flags/api-management:latest
-
-      - name: Build and push Read API
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          docker build -t $ECR_REGISTRY/feature-flags/api-read:$IMAGE_TAG \
-            -t $ECR_REGISTRY/feature-flags/api-read:latest \
-            -f docker/api-read.Dockerfile .
-          docker push $ECR_REGISTRY/feature-flags/api-read:$IMAGE_TAG
-          docker push $ECR_REGISTRY/feature-flags/api-read:latest
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build-images
-    if: github.ref == 'refs/heads/main'
-
-    env:
-      DB_SECRET_ARN: ${{ secrets.DB_SECRET_ARN }}
-      RDS_ENDPOINT: ${{ secrets.RDS_ENDPOINT }} # Utilisez vars. ou secrets. selon où vous le stockez
-      VPC_SUBNET_IDS: ${{ secrets.VPC_SUBNET_IDS }}
-      APP_SECURITY_GROUP_ID: ${{ secrets.APP_SECURITY_GROUP_ID }}
-      AWS_REGION: us-east-1
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -128,107 +101,240 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # --------------------------------------------------
-      # PHASE 1 : Préparation de la Migration
-      # --------------------------------------------------
-      - name: Retrieve DB Credentials from Secret Manager
-        id: db-credentials
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Generate image metadata
+        id: meta
         run: |
-          # Récupère le JSON du secret
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "IMAGE_TAG=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "TIMESTAMP=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Build and push Management API
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.meta.outputs.IMAGE_TAG }}
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/feature-flags/api-management:$IMAGE_TAG \
+            -t $ECR_REGISTRY/feature-flags/api-management:latest \
+            -f docker/api-management.Dockerfile \
+            .
+
+          docker push $ECR_REGISTRY/feature-flags/api-management:$IMAGE_TAG
+          docker push $ECR_REGISTRY/feature-flags/api-management:latest
+
+      - name: Build and push Read API
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.meta.outputs.IMAGE_TAG }}
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/feature-flags/api-read:$IMAGE_TAG \
+            -t $ECR_REGISTRY/feature-flags/api-read:latest \
+            -f docker/api-read.Dockerfile \
+            .
+
+          docker push $ECR_REGISTRY/feature-flags/api-read:$IMAGE_TAG
+          docker push $ECR_REGISTRY/feature-flags/api-read:latest
+
+  # ============================================
+  # JOB 3 : Database Migration
+  # ============================================
+  migrate-database:
+    name: Run Database Migrations
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Retrieve DB credentials
+        id: db-creds
+        run: |
           SECRET_JSON=$(aws secretsmanager get-secret-value \
-            --secret-id "${{ env.DB_SECRET_ARN }}" \
+            --secret-id "${{ secrets.DB_SECRET_ARN }}" \
             --query SecretString \
             --output text)
-            
-          # Extrait l'utilisateur et le mot de passe
+
           USERNAME=$(echo $SECRET_JSON | jq -r '.username')
           PASSWORD=$(echo $SECRET_JSON | jq -r '.password')
-          DBNAME="featureflags" # Nom de base de données défini dans la stack
-          PORT="5432"
 
-          # Construit le DATABASE_URL complet
-          DATABASE_URL="postgresql://${USERNAME}:${PASSWORD}@${{ env.RDS_ENDPOINT }}:${PORT}/${DBNAME}?schema=public"
+          DATABASE_URL="postgresql://${USERNAME}:${PASSWORD}@${{ vars.RDS_ENDPOINT }}:5432/featureflags?schema=public"
 
-          # Exporte le DATABASE_URL pour l'utiliser dans les étapes suivantes
           echo "DATABASE_URL=$DATABASE_URL" >> $GITHUB_ENV
-          echo "Migration URL construite avec succès."
-        shell: bash
-        # NÉCESSITE LE PACKAGE `jq` pour traiter le JSON (installé par défaut sur Ubuntu-latest)
+          echo "✅ Database URL constructed"
 
-      # --------------------------------------------------
-      # PHASE 2 : Exécution de la Migration via Tâche ECS
-      # --------------------------------------------------
-      - name: Run Prisma Migration on RDS using Fargate Task
-        id: migration-task
+      - name: Run Prisma migrations via ECS Task
         run: |
-          # Le nom de la Task Definition est le nom de la Stack + le nom de la ressource.
-          # Nous utiliserons le ManagementService Task Definition comme template.
-          TASK_DEF_FAMILY="FeatureFlagsComputeStack-ManagementTaskDefinition"
+          echo "🚀 Launching migration task..."
 
-          echo "Lancement de la migration Fargate..."
+          # Récupérer la Task Definition ARN
+          TASK_DEF_ARN=$(aws ecs list-task-definitions \
+            --family-prefix FeatureFlagsComputeStack-ManagementTaskDef \
+            --status ACTIVE \
+            --sort DESC \
+            --max-items 1 \
+            --query 'taskDefinitionArns[0]' \
+            --output text)
 
-          # 1. Lancer la tâche Fargate de migration
+          echo "Using Task Definition: $TASK_DEF_ARN"
+
+          # Lancer la tâche avec override de commande
           TASK_ARN=$(aws ecs run-task \
-            --cluster feature-flags-cluster \
-            --task-definition ${TASK_DEF_FAMILY} \
+            --cluster ${{ env.CLUSTER_NAME }} \
+            --task-definition $TASK_DEF_ARN \
             --launch-type FARGATE \
             --count 1 \
             --platform-version LATEST \
-            --network-configuration "awsvpcConfiguration={subnets=[${{ env.VPC_SUBNET_IDS }}],securityGroups=[${{ env.APP_SECURITY_GROUP_ID }}],assignPublicIp=DISABLED}" \
+            --network-configuration "awsvpcConfiguration={
+              subnets=[${{ vars.VPC_SUBNET_IDS }}],
+              securityGroups=[${{ vars.APP_SECURITY_GROUP_ID }}],
+              assignPublicIp=DISABLED
+            }" \
             --overrides '{
-                "containerOverrides": [
-                    {
-                        "name": "management-service", 
-                        "command": ["sh", "-c", "npm install && npm --workspace=@repo/database run db:migrate:prod"], 
-                        "environment": [
-                            {"name": "DATABASE_URL", "value": "${{ env.DATABASE_URL }}"}
-                        ]
-                    }
+              "containerOverrides": [{
+                "name": "management-service",
+                "command": ["sh", "-c", "cd packages/database && npm run db:migrate:prod"],
+                "environment": [
+                  {"name": "DATABASE_URL", "value": "${{ env.DATABASE_URL }}"}
                 ]
+              }]
             }' \
             --query 'tasks[0].taskArn' \
             --output text)
 
-          if [ "$TASK_ARN" == "None" ] || [ -z "$TASK_ARN" ]; then
-            echo "::error::Échec du lancement de la tâche de migration ECS."
+          if [ -z "$TASK_ARN" ] || [ "$TASK_ARN" == "None" ]; then
+            echo "❌ Failed to launch migration task"
             exit 1
           fi
 
-          echo "Tâche de migration $TASK_ARN lancée."
+          echo "✅ Migration task launched: $TASK_ARN"
 
-          # 2. Attendre que la tâche se termine (succès ou échec)
-          # Utilisation de la commande 'wait' ECS
+          # Attendre la fin de la tâche
+          echo "⏳ Waiting for migration to complete..."
           aws ecs wait tasks-stopped \
-            --cluster feature-flags-cluster \
+            --cluster ${{ env.CLUSTER_NAME }} \
             --tasks $TASK_ARN
-            
-          # 3. Vérifier le statut d'arrêt
-          TASK_STATUS=$(aws ecs describe-tasks \
-            --cluster feature-flags-cluster \
+
+          # Vérifier le statut final
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster ${{ env.CLUSTER_NAME }} \
             --tasks $TASK_ARN \
-            --query 'tasks[0].stoppedReason' \
+            --query 'tasks[0].containers[0].exitCode' \
             --output text)
 
-          if [[ "$TASK_STATUS" == "Essential container in task exited" ]]; then
-              echo "::error::La migration a échoué. Cause: $TASK_STATUS. Vérifiez les logs de la tâche $TASK_ARN."
-              exit 1
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "❌ Migration failed with exit code: $EXIT_CODE"
+            exit 1
           fi
 
-          echo "🎉 Migration de base de données terminée avec succès."
-        shell: bash
+          echo "✅ Database migration completed successfully"
 
-      # --------------------------------------------------
-      # PHASE 3 : Déploiement des Services API
-      # --------------------------------------------------
-      - name: Deploy new images to ECS
+  # ============================================
+  # JOB 4 : Deploy to ECS
+  # ============================================
+  deploy-ecs:
+    name: Deploy to ECS
+    runs-on: ubuntu-latest
+    needs: migrate-database
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Force new deployment - Management Service
         run: |
-          # Les services ECS peuvent maintenant démarrer avec la certitude que 
-          # le schéma de la base de données est à jour.
+          aws ecs update-service \
+            --cluster ${{ env.CLUSTER_NAME }} \
+            --service ManagementService \
+            --force-new-deployment \
+            --query 'service.serviceName' \
+            --output text
 
-          aws ecs update-service --cluster feature-flags-cluster \
-            --service ManagementService --force-new-deployment
+          echo "✅ Management service deployment triggered"
 
-          aws ecs update-service --cluster feature-flags-cluster \
-            --service ReadService --force-new-deployment
+      - name: Force new deployment - Read Service
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.CLUSTER_NAME }} \
+            --service ReadService \
+            --force-new-deployment \
+            --query 'service.serviceName' \
+            --output text
 
-          echo "🚀 Déploiement ECS forcé déclenché pour les deux services."
+          echo "✅ Read service deployment triggered"
+
+      - name: Wait for stable deployment
+        run: |
+          echo "⏳ Waiting for services to stabilize (max 10 minutes)..."
+
+          aws ecs wait services-stable \
+            --cluster ${{ env.CLUSTER_NAME }} \
+            --services ManagementService ReadService \
+            --region ${{ env.AWS_REGION }} \
+            --cli-read-timeout 600 \
+            --cli-connect-timeout 600
+
+          echo "✅ All services are stable"
+
+      - name: Verify deployment
+        run: |
+          # Récupérer l'ALB DNS
+          ALB_DNS=$(aws cloudformation describe-stacks \
+            --stack-name FeatureFlagsComputeStack \
+            --query 'Stacks[0].Outputs[?OutputKey==`ALBDNSName`].OutputValue' \
+            --output text)
+
+          echo "🔍 Testing endpoints on: $ALB_DNS"
+
+          # Test Management API
+          if curl -f -m 10 "http://${ALB_DNS}/api/v1/management/health"; then
+            echo "✅ Management API is healthy"
+          else
+            echo "⚠️ Management API health check failed (may take a few minutes to warm up)"
+          fi
+
+          # Test Read API
+          if curl -f -m 10 "http://${ALB_DNS}/api/v1/eval"; then
+            echo "✅ Read API is responding"
+          else
+            echo "⚠️ Read API not yet responsive"
+          fi
+
+  # ============================================
+  # JOB 5 : Notification (optionnel)
+  # ============================================
+  notify:
+    name: Send Deployment Notification
+    runs-on: ubuntu-latest
+    needs: deploy-ecs
+    if: always()
+
+    steps:
+      - name: Deployment status
+        run: |
+          if [ "${{ needs.deploy-ecs.result }}" == "success" ]; then
+            echo "✅ Deployment succeeded!"
+            echo "🚀 Feature Flags Platform is now live"
+          else
+            echo "❌ Deployment failed"
+            echo "Check the logs above for details"
+            exit 1
+          fi

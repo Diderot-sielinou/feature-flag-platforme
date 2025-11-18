@@ -6,29 +6,23 @@ import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
-// Ajouter les imports pour la messagerie
-import * as sns from 'aws-cdk-lib/aws-sns';
-import * as sqs from 'aws-cdk-lib/aws-sqs';
-import * as events from 'aws-cdk-lib/aws-events';
 import { Construct } from 'constructs';
 
-// Mise à jour de l'interface pour inclure les ressources de messagerie
 interface ComputeStackProps extends cdk.StackProps {
   vpc: ec2.Vpc;
   applicationSecurityGroup: ec2.SecurityGroup;
   dbSecret: secretsmanager.Secret;
   dbEndpoint: string;
   albSecurityGroup: ec2.SecurityGroup;
-
-  // *** CHANGEMENT: On n'utilise plus redisEndpoint ***
   redisEndpoint: string;
   userPoolId: string;
   userPoolClientId: string;
-  // *** AJOUT: ARNs/URLs des ressources de messagerie ***
   flagTopicArn: string;
   readQueueArn: string;
   readQueueUrl: string;
   eventBusName: string;
+  managementEcr: ecr.Repository;
+  readEcr: ecr.Repository;
 }
 
 export class ComputeStack extends cdk.Stack {
@@ -36,44 +30,60 @@ export class ComputeStack extends cdk.Stack {
   public readonly managementService: ecs.FargateService;
   public readonly readService: ecs.FargateService;
   public readonly alb: elbv2.ApplicationLoadBalancer;
-  public readonly managementEcr: ecr.Repository;
-  public readonly readEcr: ecr.Repository;
+  // public readonly managementEcr: ecr.Repository;
+  // public readonly readEcr: ecr.Repository;
 
   constructor(scope: Construct, id: string, props: ComputeStackProps) {
     super(scope, id, props);
 
+    // ========================================
     // ECS Cluster
+    // ========================================
     this.cluster = new ecs.Cluster(this, 'FeatureFlagsCluster', {
       vpc: props.vpc,
       clusterName: 'feature-flags-cluster',
       containerInsights: true,
     });
 
+    // ========================================
     // ECR Repositories
-    const managementRepo = new ecr.Repository(this, 'ManagementAPIRepo', {
-      repositoryName: 'feature-flags/api-management',
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      imageScanOnPush: true,
-    });
+    // ========================================
+    // this.managementEcr = new ecr.Repository(this, 'ManagementAPIRepo', {
+    //   repositoryName: 'feature-flags/api-management',
+    //   removalPolicy: cdk.RemovalPolicy.DESTROY,
+    //   imageScanOnPush: true,
+    //   lifecycleRules: [
+    //     {
+    //       description: 'Keep last 10 images',
+    //       maxImageCount: 10,
+    //     },
+    //   ],
+    // });
 
-    const readRepo = new ecr.Repository(this, 'ReadAPIRepo', {
-      repositoryName: 'feature-flags/api-read',
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      imageScanOnPush: true,
-    });
+    // this.readEcr = new ecr.Repository(this, 'ReadAPIRepo', {
+    //   repositoryName: 'feature-flags/api-read',
+    //   removalPolicy: cdk.RemovalPolicy.DESTROY,
+    //   imageScanOnPush: true,
+    //   lifecycleRules: [
+    //     {
+    //       description: 'Keep last 10 images',
+    //       maxImageCount: 10,
+    //     },
+    //   ],
+    // });
 
-    this.managementEcr = managementRepo;
-    this.readEcr = readRepo;
-
+    // ========================================
     // Application Load Balancer
+    // ========================================
     this.alb = new elbv2.ApplicationLoadBalancer(this, 'ALB', {
       vpc: props.vpc,
       internetFacing: true,
       securityGroup: props.albSecurityGroup,
       vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+      deletionProtection: false, // Pour faciliter les tests
     });
 
-    // Target Groups
+    // Target Groups avec health checks optimisés
     const managementTG = new elbv2.ApplicationTargetGroup(this, 'ManagementTG', {
       vpc: props.vpc,
       port: 3000,
@@ -85,6 +95,7 @@ export class ComputeStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(5),
         healthyThresholdCount: 2,
         unhealthyThresholdCount: 3,
+        healthyHttpCodes: '200',
       },
       deregistrationDelay: cdk.Duration.seconds(30),
     });
@@ -100,11 +111,14 @@ export class ComputeStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(5),
         healthyThresholdCount: 2,
         unhealthyThresholdCount: 3,
+        healthyHttpCodes: '200',
       },
       deregistrationDelay: cdk.Duration.seconds(10),
     });
 
-    // Listeners
+    // ========================================
+    // ALB Listeners & Routing
+    // ========================================
     const httpListener = this.alb.addListener('HTTPListener', {
       port: 80,
       protocol: elbv2.ApplicationProtocol.HTTP,
@@ -114,7 +128,7 @@ export class ComputeStack extends cdk.Stack {
       }),
     });
 
-    // Route to services based on path
+    // Routes vers les services
     httpListener.addTargetGroups('ManagementRule', {
       targetGroups: [managementTG],
       priority: 10,
@@ -127,52 +141,51 @@ export class ComputeStack extends cdk.Stack {
       conditions: [elbv2.ListenerCondition.pathPatterns(['/api/v1/eval', '/api/v1/sse/*'])],
     });
 
-    // Redirect HTTP to HTTPS
-    // this.alb.addListener('HTTPListener', {
-    //   port: 80,
-    //   protocol: elbv2.ApplicationProtocol.HTTP,
-    //   defaultAction: elbv2.ListenerAction.redirect({
-    //     protocol: 'HTTPS',
-    //     port: '443',
-    //     permanent: true,
-    //   }),
-    // });
-
+    // ========================================
     // IAM Role for ECS Tasks
+    // ========================================
     const taskRole = new iam.Role(this, 'ECSTaskRole', {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
       description: 'Role for Feature Flags ECS Tasks',
     });
 
-    // Grant read access to secrets
+    // Grant read access to DB secrets
     props.dbSecret.grantRead(taskRole);
 
-    // *** CHANGEMENT: Accorder les permissions de messagerie ***
-    // Permissions pour le service de gestion (publish)
-    const managementPolicy = new iam.PolicyStatement({
-      effect: iam.Effect.ALLOW,
-      actions: [
-        'sns:Publish', // Pour publier sur SNS
-        'events:PutEvents', // Pour publier sur EventBridge
-      ],
-      resources: [props.flagTopicArn], // ou l'ARN de l'EventBus si vous l'utilisez directement
-    });
-    taskRole.addToPolicy(managementPolicy);
+    // Permissions pour SNS/SQS/EventBridge
+    taskRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['sns:Publish', 'events:PutEvents'],
+        resources: [props.flagTopicArn],
+      }),
+    );
 
-    // Permissions pour le service de lecture (consume SQS)
-    const readPolicy = new iam.PolicyStatement({
-      effect: iam.Effect.ALLOW,
-      actions: [
-        'sqs:ReceiveMessage',
-        'sqs:DeleteMessage',
-        'sqs:GetQueueAttributes',
-        'sqs:ChangeMessageVisibility',
-      ],
-      resources: [props.readQueueArn], // ARN de la queue READ
-    });
-    taskRole.addToPolicy(readPolicy);
+    taskRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'sqs:ReceiveMessage',
+          'sqs:DeleteMessage',
+          'sqs:GetQueueAttributes',
+          'sqs:ChangeMessageVisibility',
+        ],
+        resources: [props.readQueueArn],
+      }),
+    );
 
+    // Permissions pour CloudWatch Logs
+    taskRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['logs:CreateLogStream', 'logs:PutLogEvents'],
+        resources: ['*'],
+      }),
+    );
+
+    // ========================================
     // CloudWatch Logs Groups
+    // ========================================
     const managementLogGroup = new logs.LogGroup(this, 'ManagementLogs', {
       logGroupName: '/ecs/feature-flags/management',
       retention: logs.RetentionDays.ONE_WEEK,
@@ -185,32 +198,32 @@ export class ComputeStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    // ========================================
     // Task Definitions
+    // ========================================
     const managementTaskDef = new ecs.FargateTaskDefinition(this, 'ManagementTaskDef', {
       memoryLimitMiB: 2048,
       cpu: 1024,
-      taskRole: taskRole, // Le rôle avec les nouvelles permissions
+      taskRole: taskRole,
     });
 
     const readTaskDef = new ecs.FargateTaskDefinition(this, 'ReadTaskDef', {
       memoryLimitMiB: 2048,
       cpu: 1024,
-      taskRole: taskRole, // Le même rôle est suffisant ici si les permissions sont suffisantes
-      // Si vous souhaitez des rôles séparés pour plus de granularité, créez-en un autre.
+      taskRole: taskRole,
     });
 
-    // Environment variables
-    // *** CHANGEMENT: Supprimer REDIS_HOST et REDIS_PORT, ajouter les variables de messagerie ***
-    // Environment variables
+    // ========================================
+    // Environment Variables
+    // ========================================
     const commonEnv = {
       NODE_ENV: 'production',
       AWS_REGION: cdk.Aws.REGION,
 
-      // ---- REDIS (corrigé pour TLS) ----
+      // Redis
       REDIS_HOST: props.redisEndpoint,
       REDIS_PORT: '6379',
       REDIS_TLS: 'false',
-      REDIS_URL: `redis://${props.redisEndpoint}:6379`,
 
       // Cognito
       COGNITO_USER_POOL_ID: props.userPoolId,
@@ -224,27 +237,50 @@ export class ComputeStack extends cdk.Stack {
 
     const managementEnv = {
       ...commonEnv,
-      DATABASE_URL: `postgresql://{{resolve:secretsmanager:${props.dbSecret.secretArn}:SecretString:username}}:{{resolve:secretsmanager:${props.dbSecret.secretArn}:SecretString:password}}@${props.dbEndpoint}:5432/featureflags`,
       PORT: '3000',
-      JWT: 'gtjgo',
+      JWT_SECRET: 'CHANGE_IN_PRODUCTION', // À remplacer par un secret AWS
+    };
+
+    // Secrets (références sécurisées)
+    const dbSecrets = {
+      DATABASE_URL: ecs.Secret.fromSecretsManager(props.dbSecret, 'DATABASE_URL'),
     };
 
     const readEnv = {
-      ...commonEnv, // Toujours avec les variables de messagerie pour les SSE ou autres usages
+      ...commonEnv,
       PORT: '3001',
     };
 
+    // ========================================
+    // 🔥 STRATÉGIE D'IMAGE INITIALE
+    // ========================================
+    // Option 1: Image placeholder qui répond au health check
+    const placeholderImage = 'public.ecr.aws/docker/library/httpd:2.4-alpine';
+
+    // Option 2: Référence ECR (nécessite que l'image existe)
+    // const managementImage = ecs.ContainerImage.fromEcrRepository(this.managementEcr, 'latest');
+
+    // ========================================
     // Container Definitions
+    // ========================================
     managementTaskDef.addContainer('management-service', {
-      image: ecs.ContainerImage.fromRegistry('public.ecr.aws/docker/library/nginx:latest'),
+      // 🚨 DÉMARRAGE: Utiliser placeholder, puis mettre à jour via GitHub Actions
+      image: ecs.ContainerImage.fromRegistry(placeholderImage),
+
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'management',
         logGroup: managementLogGroup,
       }),
       environment: managementEnv,
+      secrets: dbSecrets,
       portMappings: [{ containerPort: 3000 }],
+
+      // Health check léger pour httpd
       healthCheck: {
-        command: ['CMD-SHELL', 'curl -f http://localhost:3000/health || exit 1'],
+        command: [
+          'CMD-SHELL',
+          'wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1',
+        ],
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(5),
         retries: 3,
@@ -253,15 +289,20 @@ export class ComputeStack extends cdk.Stack {
     });
 
     readTaskDef.addContainer('read-service', {
-      image: ecs.ContainerImage.fromRegistry('public.ecr.aws/docker/library/nginx:latest'),
+      image: ecs.ContainerImage.fromRegistry(placeholderImage),
+
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'read',
         logGroup: readLogGroup,
       }),
-      environment: readEnv, // Avec les variables de messagerie
+      environment: readEnv,
       portMappings: [{ containerPort: 3001 }],
+
       healthCheck: {
-        command: ['CMD-SHELL', 'curl -f http://localhost:3001/health || exit 1'],
+        command: [
+          'CMD-SHELL',
+          'wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1',
+        ],
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(5),
         retries: 3,
@@ -269,37 +310,49 @@ export class ComputeStack extends cdk.Stack {
       },
     });
 
+    // ========================================
     // Fargate Services
+    // ========================================
     this.managementService = new ecs.FargateService(this, 'ManagementService', {
       cluster: this.cluster,
       taskDefinition: managementTaskDef,
-      desiredCount: 2,
-      minHealthyPercent: 100,
+      desiredCount: 1, // Commencer avec 1 seule instance
+      minHealthyPercent: 0, // Permettre le remplacement complet lors du premier déploiement
       maxHealthyPercent: 200,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [props.applicationSecurityGroup],
       enableExecuteCommand: true,
+      circuitBreaker: {
+        rollback: true, // Rollback automatique en cas d'échec
+      },
     });
 
     this.readService = new ecs.FargateService(this, 'ReadService', {
       cluster: this.cluster,
       taskDefinition: readTaskDef,
-      desiredCount: 3,
-      minHealthyPercent: 100,
+      desiredCount: 1,
+      minHealthyPercent: 0,
       maxHealthyPercent: 200,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [props.applicationSecurityGroup],
       enableExecuteCommand: true,
+      circuitBreaker: {
+        rollback: true,
+      },
     });
 
     // Attach to target groups
     managementTG.addTarget(this.managementService);
     readTG.addTarget(this.readService);
 
-    // Auto Scaling for Read Service
+    // ========================================
+    // Auto Scaling (désactivé initialement)
+    // ========================================
+    // Vous pourrez activer ceci après le premier déploiement réussi
+    /*
     const readScaling = this.readService.autoScaleTaskCount({
-      minCapacity: 3,
-      maxCapacity: 20,
+      minCapacity: 2,
+      maxCapacity: 10,
     });
 
     readScaling.scaleOnCpuUtilization('CpuScaling', {
@@ -307,25 +360,30 @@ export class ComputeStack extends cdk.Stack {
       scaleInCooldown: cdk.Duration.seconds(60),
       scaleOutCooldown: cdk.Duration.seconds(60),
     });
+    */
 
-    readScaling.scaleOnMemoryUtilization('MemoryScaling', {
-      targetUtilizationPercent: 80,
-      scaleInCooldown: cdk.Duration.seconds(60),
-      scaleOutCooldown: cdk.Duration.seconds(60),
-    });
-
-    // Outputs (inchangés)
+    // ========================================
+    // Outputs
+    // ========================================
     new cdk.CfnOutput(this, 'ALBDNSName', {
       value: this.alb.loadBalancerDnsName,
+      description: 'URL du Load Balancer',
       exportName: 'FeatureFlagsALBDNS',
     });
 
     new cdk.CfnOutput(this, 'ManagementRepoURI', {
-      value: managementRepo.repositoryUri,
+      value: props.managementEcr.repositoryUri,
+      description: 'URI du dépôt ECR Management',
     });
 
     new cdk.CfnOutput(this, 'ReadRepoURI', {
-      value: readRepo.repositoryUri,
+      value: props.readEcr.repositoryUri,
+      description: 'URI du dépôt ECR Read',
+    });
+
+    new cdk.CfnOutput(this, 'ClusterName', {
+      value: this.cluster.clusterName,
+      description: 'Nom du cluster ECS',
     });
   }
 }

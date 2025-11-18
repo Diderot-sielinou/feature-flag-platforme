@@ -9,6 +9,7 @@ import { AuthStack } from '../lib/auth-stack';
 import { MessagingStack } from '../lib/messaging-stack';
 import { ComputeStack } from '../lib/compute-stack';
 import { MonitoringStack } from '../lib/monitoring-stack';
+import { ECRStack } from '../lib/ecr-stack';
 
 // Frontends
 // import { DashboardStack } from '../lib/dashboard-stack';
@@ -57,6 +58,13 @@ const messagingStack = new MessagingStack(app, 'FeatureFlagsMessagingStack', {
 messagingStack.addDependency(networkStack);
 
 // -------------------------------------------------------
+//  ecr
+// -------------------------------------------------------
+const ecrStack = new ECRStack(app, 'FeatureFlagsECRStack', {
+  env,
+});
+
+// -------------------------------------------------------
 // 5. Compute (ECS Fargate services)
 // -------------------------------------------------------
 const computeStack = new ComputeStack(app, 'FeatureFlagsComputeStack', {
@@ -76,11 +84,15 @@ const computeStack = new ComputeStack(app, 'FeatureFlagsComputeStack', {
   readQueueArn: messagingStack.readQueue.queueArn,
   readQueueUrl: messagingStack.readQueue.queueUrl,
   eventBusName: messagingStack.eventBus.eventBusName,
+
+  managementEcr: ecrStack.managementRepo,
+  readEcr: ecrStack.readRepo,
 });
 
 computeStack.addDependency(databaseStack);
 computeStack.addDependency(authStack);
 computeStack.addDependency(messagingStack);
+computeStack.addDependency(ecrStack);
 
 // -------------------------------------------------------
 // 6. Dashboard (Next.js → S3 + CloudFront)

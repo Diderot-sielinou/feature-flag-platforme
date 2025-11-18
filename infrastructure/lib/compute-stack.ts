@@ -213,6 +213,9 @@ export class ComputeStack extends cdk.Stack {
       taskRole: taskRole,
     });
 
+    // URL de connexion à la base de données (commune aux deux services)
+    const databaseUrl = `postgresql://{{resolve:secretsmanager:${props.dbSecret.secretArn}:SecretString:username}}:{{resolve:secretsmanager:${props.dbSecret.secretArn}:SecretString:password}}@${props.dbEndpoint}:5432/featureflags`;
+
     // ========================================
     // Environment Variables
     // ========================================
@@ -238,6 +241,7 @@ export class ComputeStack extends cdk.Stack {
     const managementEnv = {
       ...commonEnv,
       PORT: '3000',
+      DATABASE_URL: databaseUrl,
       JWT_SECRET: 'CHANGE_IN_PRODUCTION', // À remplacer par un secret AWS
     };
 
@@ -249,6 +253,7 @@ export class ComputeStack extends cdk.Stack {
     const readEnv = {
       ...commonEnv,
       PORT: '3001',
+      DATABASE_URL: databaseUrl,
     };
 
     // ========================================

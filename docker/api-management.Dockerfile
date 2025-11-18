@@ -31,7 +31,7 @@ RUN npx turbo run build --filter=api-management
 # ================================
 FROM node:20-alpine AS runner
 
-RUN apk add --no-cache curl openssl1.1-compat
+RUN apk add --no-cache curl openssl
 
 WORKDIR /app
 

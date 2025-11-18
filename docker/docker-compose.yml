@@ -9,7 +9,8 @@ services:
       POSTGRES_PASSWORD: ffpassword
       POSTGRES_DB: featureflags
     ports:
-      - '5432:5432'
+      # CHANGEMENT: Expose le port interne 5432 sur le port 5433 de l'hôte
+      - '5433:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -24,7 +25,8 @@ services:
     image: redis:7-alpine
     container_name: ff-redis
     ports:
-      - '6379:6379'
+      # CHANGEMENT: Expose le port interne 6379 sur le port 6380 de l'hôte
+      - '6380:6379'
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
@@ -59,6 +61,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3000
+      # IMPORTANT: La connexion entre conteneurs utilise toujours les noms de service internes ('postgres:5432')
       DATABASE_URL: postgresql://ffuser:ffpassword@postgres:5432/featureflags?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379

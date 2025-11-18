@@ -12,23 +12,24 @@ COPY packages ./packages
 COPY apps/api-read ./apps/api-read
 
 # Installer les dépendances (verrouillées par package-lock.json)
-RUN npm ci # <--- CHANGEMENT: npm ci au lieu de pnpm install --frozen-lockfile
+RUN npm ci
+#   Installer Prisma même pour Read API
+WORKDIR /app/packages/database
+RUN npm run db:generate
 
 # Construire les packages partagés nécessaires
 RUN npm exec -- turbo run build --filter @repo/shared # <--- CHANGEMENT: npm exec -- turbo run build
 
 # Construire l'API de lecture
-RUN npm exec -- turbo run build --filter api-read # <--- CHANGEMENT: npm exec -- turbo run build
+# Build via Turbo
+WORKDIR /app
+RUN npx turbo run build --filter=api-read
 
 # --- Étape de Production ---
 FROM node:20-alpine AS runner
 
-# Installer curl pour healthcheck
-RUN apk add --no-cache curl
-
-
-# Installer curl pour les health checks
-RUN apk add --no-cache curl
+# Installer curl ET openssl
+RUN apk add --no-cache curl openssl
 
 WORKDIR /app
 
@@ -46,9 +47,9 @@ ENV NODE_ENV=production
 # Exposer le port sur lequel l'API écoutera
 EXPOSE 3001
 
-# Définir une commande de health check
+# Health check plus robuste
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:3001/health || exit 1
 
-# Commande pour démarrer l'application
+# Commande de démarrage explicite
 CMD ["node", "dist/main.js"]

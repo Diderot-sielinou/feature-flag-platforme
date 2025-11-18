@@ -19,7 +19,7 @@ export class DatabaseStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: DatabaseStackProps) {
     super(scope, id, props);
 
-    // Secret pour les credentials de la base de données
+    // Secret pour les credentials de la base de données (inchangé)
     this.dbSecret = new secretsmanager.Secret(this, 'DBSecret', {
       secretName: 'feature-flags/db-credentials',
       generateSecretString: {
@@ -30,12 +30,13 @@ export class DatabaseStack extends cdk.Stack {
       },
     });
 
-    // RDS PostgreSQL avec Multi-AZ
+    // RDS PostgreSQL - AJUSTÉ POUR FREE TIER
     this.dbInstance = new rds.DatabaseInstance(this, 'PostgreSQLInstance', {
       engine: rds.DatabaseInstanceEngine.postgres({
-        version: rds.PostgresEngineVersion.VER_16_1,
+        version: rds.PostgresEngineVersion.VER_15,
       }),
-      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MEDIUM),
+      // 🚨 CORRECTION: Passer à T3.MICRO (Free Tier)
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO),
       vpc: props.vpc,
       vpcSubnets: {
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
@@ -43,17 +44,17 @@ export class DatabaseStack extends cdk.Stack {
       securityGroups: [props.databaseSecurityGroup],
       credentials: rds.Credentials.fromSecret(this.dbSecret),
       databaseName: 'featureflags',
-      multiAz: true, // Haute disponibilité
-      allocatedStorage: 100,
-      maxAllocatedStorage: 500, // Autoscaling du storage
-      backupRetention: cdk.Duration.days(7),
-      deletionProtection: true,
+      multiAz: false, // Correct pour Free Tier
+      allocatedStorage: 20, // 20GB est la limite minimale/Free Tier
+      maxAllocatedStorage: 100, // Une limite plus raisonnable
+      backupRetention: cdk.Duration.days(1), // Correct pour Free Tier
+      deletionProtection: false, // Désactivé pour faciliter les suppressions/tests
       storageEncrypted: true,
-      enablePerformanceInsights: true,
-      performanceInsightRetention: rds.PerformanceInsightRetention.DEFAULT,
+      enablePerformanceInsights: false, // Désactivé pour Free Tier
+      // performanceInsightRetention: rds.PerformanceInsightRetention.DEFAULT,
     });
 
-    // Subnet Group pour ElastiCache
+    // Subnet Group pour ElastiCache (inchangé)
     const subnetGroup = new elasticache.CfnSubnetGroup(this, 'RedisSubnetGroup', {
       description: 'Subnet group for Redis cluster',
       subnetIds: props.vpc.selectSubnets({
@@ -61,23 +62,29 @@ export class DatabaseStack extends cdk.Stack {
       }).subnetIds,
     });
 
-    // ElastiCache Redis Cluster avec réplication
+    // ElastiCache Redis Cluster - AJUSTÉ POUR FREE TIER
     this.redisCluster = new elasticache.CfnReplicationGroup(this, 'RedisCluster', {
       replicationGroupDescription: 'Feature Flags Redis Cluster',
       engine: 'redis',
-      cacheNodeType: 'cache.r7g.large',
-      numCacheClusters: 2, // 1 primary + 1 replica
-      automaticFailoverEnabled: true,
-      multiAzEnabled: true,
+      // 🚨 CORRECTION: Passer à cache.t3.micro (Free Tier)
+      cacheNodeType: 'cache.t3.micro',
+      // 🚨 CORRECTION: Un seul cluster (Free Tier)
+      numCacheClusters: 1,
+      // 🚨 CORRECTION: Désactiver pour un seul cluster
+      automaticFailoverEnabled: false,
+      multiAzEnabled: false, // Désactiver pour un seul cluster
       cacheSubnetGroupName: subnetGroup.ref,
       securityGroupIds: [props.cacheSecurityGroup.securityGroupId],
-      atRestEncryptionEnabled: true,
-      transitEncryptionEnabled: true,
+      atRestEncryptionEnabled: false,
+      transitEncryptionEnabled: false,
       engineVersion: '7.0',
-      snapshotRetentionLimit: 5,
+      snapshotRetentionLimit: 0, // Désactiver la rétention pour Free Tier
     });
 
-    // Outputs
+    // ⚠️ AJOUT: Politique de suppression pour éviter les blocages de rollback
+    this.redisCluster.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
+
+    // Outputs (inchangés)
     new cdk.CfnOutput(this, 'DBEndpoint', {
       value: this.dbInstance.dbInstanceEndpointAddress,
       exportName: 'FeatureFlagsDBEndpoint',

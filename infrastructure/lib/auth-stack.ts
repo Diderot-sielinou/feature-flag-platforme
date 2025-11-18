@@ -43,7 +43,7 @@ export class AuthStack extends cdk.Stack {
         sms: true,
         otp: true,
       },
-      advancedSecurityMode: cognito.AdvancedSecurityMode.ENFORCED,
+      // advancedSecurityMode: cognito.AdvancedSecurityMode.ENFORCED,
       userVerification: {
         emailSubject: 'Verify your email for Feature Flags Platform',
         emailBody: 'Hello {username}, Your verification code is {####}',

@@ -9,10 +9,11 @@ import { AuthStack } from '../lib/auth-stack';
 import { MessagingStack } from '../lib/messaging-stack';
 import { ComputeStack } from '../lib/compute-stack';
 import { MonitoringStack } from '../lib/monitoring-stack';
+import { ECRStack } from '../lib/ecr-stack';
 
 // Frontends
-import { DashboardStack } from '../lib/dashboard-stack';
-import { DocumentationStack } from '../lib/documentation-stack';
+// import { DashboardStack } from '../lib/dashboard-stack';
+// import { DocumentationStack } from '../lib/documentation-stack';
 
 // CI/CD
 // import { PipelineStack } from '../lib/pipeline-stack';
@@ -57,12 +58,20 @@ const messagingStack = new MessagingStack(app, 'FeatureFlagsMessagingStack', {
 messagingStack.addDependency(networkStack);
 
 // -------------------------------------------------------
+//  ecr
+// -------------------------------------------------------
+const ecrStack = new ECRStack(app, 'FeatureFlagsECRStack', {
+  env,
+});
+
+// -------------------------------------------------------
 // 5. Compute (ECS Fargate services)
 // -------------------------------------------------------
 const computeStack = new ComputeStack(app, 'FeatureFlagsComputeStack', {
   env,
   vpc: networkStack.vpc,
   applicationSecurityGroup: networkStack.applicationSecurityGroup,
+  albSecurityGroup: networkStack.albSecurityGroup,
 
   dbSecret: databaseStack.dbSecret,
   dbEndpoint: databaseStack.dbInstance.dbInstanceEndpointAddress,
@@ -75,34 +84,38 @@ const computeStack = new ComputeStack(app, 'FeatureFlagsComputeStack', {
   readQueueArn: messagingStack.readQueue.queueArn,
   readQueueUrl: messagingStack.readQueue.queueUrl,
   eventBusName: messagingStack.eventBus.eventBusName,
+
+  managementEcr: ecrStack.managementRepo,
+  readEcr: ecrStack.readRepo,
 });
 
 computeStack.addDependency(databaseStack);
 computeStack.addDependency(authStack);
 computeStack.addDependency(messagingStack);
+computeStack.addDependency(ecrStack);
 
 // -------------------------------------------------------
 // 6. Dashboard (Next.js → S3 + CloudFront)
 // -------------------------------------------------------
-const dashboardStack = new DashboardStack(app, 'FeatureFlagsDashboardStack', {
-  env,
-  apiManagementBaseUrl: `https://${computeStack.alb.loadBalancerDnsName}`,
-  // domainName: "dashboard.yourcompany.com",
-  // certificateArn: "arn:aws:acm:…",
-  // hostedZoneId: "Zxxxx",
-});
+// const dashboardStack = new DashboardStack(app, 'FeatureFlagsDashboardStack', {
+//   env,
+//   apiManagementBaseUrl: `https://${computeStack.alb.loadBalancerDnsName}`,
+//   // domainName: "dashboard.yourcompany.com",
+//   // certificateArn: "arn:aws:acm:…",
+//   // hostedZoneId: "Zxxxx",
+// });
 
-dashboardStack.addDependency(computeStack);
+// dashboardStack.addDependency(computeStack);
 
 // -------------------------------------------------------
 // 7. Documentation (Docusaurus → S3 + CloudFront)
 // -------------------------------------------------------
-const documentationStack = new DocumentationStack(app, 'FeatureFlagsDocumentationStack', {
-  env,
-  // domainName: "docs.yourcompany.com",
-  // certificateArn: "arn:aws:acm:…",
-  // hostedZoneId: "Zxxxx",
-});
+// const documentationStack = new DocumentationStack(app, 'FeatureFlagsDocumentationStack', {
+//   env,
+//   // domainName: "docs.yourcompany.com",
+//   // certificateArn: "arn:aws:acm:…",
+//   // hostedZoneId: "Zxxxx",
+// });
 
 // -------------------------------------------------------
 // 8. Monitoring (CloudWatch alarms, dashboards)

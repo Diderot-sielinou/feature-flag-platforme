@@ -194,3 +194,47 @@ export class PipelineStack extends cdk.Stack {
     });
   }
 }
+/**
+ * ✅  FeatureFlagsNetworkStack
+
+✨  Deployment time: 226.68s
+
+Outputs:
+FeatureFlagsNetworkStack.ExportsOutputFnGetAttALBSGB173E466GroupId0B82B90C = sg-0165d3acb57a853ae
+FeatureFlagsNetworkStack.ExportsOutputFnGetAttAppSG652848D9GroupIdA1B0A7ED = sg-0e1fadb6014ebe5a0
+FeatureFlagsNetworkStack.ExportsOutputFnGetAttCacheSGD31B448DGroupId8EFEF3E1 = sg-00cdae180db79eedb
+FeatureFlagsNetworkStack.ExportsOutputFnGetAttDatabaseSG2A23C222GroupIdD9F3AD80 = sg-0258fdf0df1f620d6
+FeatureFlagsNetworkStack.ExportsOutputRefFeatureFlagsVPC1F319A0B3C5BA2C4 = vpc-06d1d4a750466eb45
+FeatureFlagsNetworkStack.ExportsOutputRefFeatureFlagsVPCIsolatedSubnet1Subnet7A794F50ABE819DE = subnet-0cfb40725744aac68
+FeatureFlagsNetworkStack.ExportsOutputRefFeatureFlagsVPCIsolatedSubnet2SubnetB843FA0419ADCD36 = subnet-09b9c5b8a5bb00284
+FeatureFlagsNetworkStack.ExportsOutputRefFeatureFlagsVPCIsolatedSubnet3Subnet24B941314CC2C721 = subnet-0427974607e3d32e5
+FeatureFlagsNetworkStack.ExportsOutputRefFeatureFlagsVPCPrivateSubnet1SubnetB095726E20EF9CDF = subnet-06243ea2426e73893
+FeatureFlagsNetworkStack.ExportsOutputRefFeatureFlagsVPCPrivateSubnet2SubnetBEDB936E921A2605 = subnet-0306eb0e7e3eec27d
+FeatureFlagsNetworkStack.ExportsOutputRefFeatureFlagsVPCPrivateSubnet3Subnet04FC373C94FB160C = subnet-08b51b1c08fb5673a
+FeatureFlagsNetworkStack.ExportsOutputRefFeatureFlagsVPCPublicSubnet1Subnet12D
+
+✅  FeatureFlagsMessagingStack
+
+✨  Deployment time: 150.99s
+
+Outputs:
+FeatureFlagsMessagingStack.AnalyticsQueueUrl = https://sqs.us-east-1.amazonaws.com/269417790119/feature-flags-analytics-queue
+FeatureFlagsMessagingStack.EventBusName = feature-flags-bus
+FeatureFlagsMessagingStack.ExportsOutputFnGetAttReadQueue917DFADAArnCB55DA49 = arn:aws:sqs:us-east-1:269417790119:feature-flags-read-queue
+FeatureFlagsMessagingStack.ExportsOutputRefFeatureFlagsBus5160D3B7F3C6A26B = feature-flags-bus
+FeatureFlagsMessagingStack.ExportsOutputRefFlagTopic60E89548EF1C5E1F = arn:aws:sns:us-east-1:269417790119:feature-flags-flag-updates
+FeatureFlagsMessagingStack.ExportsOutputRefReadQueue917DFADA2037C372 = https://sqs.us-east-1.amazonaws.com/269417790119/feature-flags-read-queue
+
+✅  FeatureFlagsDatabaseStack
+
+✨  Deployment time: 1232.54s
+
+Outputs:
+FeatureFlagsDatabaseStack.DBEndpoint = featureflagsdatabasestack-postgresqlinstanced9ad3c-wiqhdt96jbrt.cgruem2iateh.us-east-1.rds.amazonaws.com
+FeatureFlagsDatabaseStack.DBSecretArn = arn:aws:secretsmanager:us-east-1:269417790119:secret:feature-flags/db-credentials-OWTbCB
+FeatureFlagsDatabaseStack.ExportsOutputFnGetAttPostgreSQLInstanceD9AD3CF0EndpointAddress7B16B077 = featureflagsdatabasestack-postgresqlinstanced9ad3c-wiqhdt96jbrt.cgruem2iateh.us-east-1.rds.amazonaws.com
+FeatureFlagsDatabaseStack.ExportsOutputFnGetAttRedisClusterPrimaryEndPointAddressCFB16E1D = fer1pv741k6i3vue.jtz7ie.ng.0001.use1.cache.amazonaws.com
+FeatureFlagsDatabaseStack.ExportsOutputRefDBSecretD58955BC88D735E6 = arn:aws:secretsmanager:us-east-1:269417790119:secret:feature-flags/db-credentials-OWTbCB
+FeatureFlagsDatabaseStack.RedisEndpoint = fer1pv741k6i3vue.jtz7ie.ng.0001.use1.cache.amazonaws.com
+
+ */

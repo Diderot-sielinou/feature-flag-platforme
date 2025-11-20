@@ -1,17 +1,5 @@
 import { nestjsConfig } from '@repo/eslint-config/nestjs.js';
 
-/**
-
-* ESLint configuration for the NestJS `api-management` app
-
-* ✅ Extends the shared configuration of the @repo/eslint-config package
-
-* ✅ Compatible with CommonJS
-
-* ✅ Integrates proper TypeScript & Jest rules
-
-*/
-
 export default [
   ...nestjsConfig,
   {
@@ -25,7 +13,7 @@ export default [
     rules: {
       '@typescript-eslint/no-floating-promises': 'warn',
       '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/no-explicit-any': 'off',
+      // '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 ];

@@ -1,20 +1,25 @@
 // Imports
 import { config as baseConfig } from './packages/eslint-config/base.js';
 import { nestjsConfig } from './packages/eslint-config/nestjs.js';
-import { config as reactInternalConfig } from './packages/eslint-config/react-internal.js'; // Renommé pour clarté
+import { config as reactInternalConfig } from './packages/eslint-config/react-internal.js';
 import { nextJsConfig } from './packages/eslint-config/nextjs-app.js';
 
 // --- Construction explicite du tableau de configuration ---
 const allConfigs = [];
 
-// 1. Commencez par la configuration de base
+// 🚫 Ignorer entièrement l'infrastructure (IMPORTANT : doit être AU DÉBUT)
+allConfigs.push({
+  ignores: ['infrastructure/**/*'],
+});
+
+// 1. Configuration de base
 if (Array.isArray(baseConfig)) {
   allConfigs.push(...baseConfig);
 } else {
-  allConfigs.push(baseConfig); // Si ce n'est pas un tableau, ajoutez-le directement (inhabituel)
+  allConfigs.push(baseConfig);
 }
 
-// 2. Ajoutez la configuration pour la résolution des alias
+// 2. Résolution des alias / TS project paths
 allConfigs.push({
   settings: {
     'import/resolver': {
@@ -30,33 +35,34 @@ allConfigs.push({
   },
 });
 
-// 3. Ajoutez la configuration pour NestJS
+// 3. Configuration NestJS
 if (Array.isArray(nestjsConfig)) {
   allConfigs.push(...nestjsConfig);
 } else {
   allConfigs.push(nestjsConfig);
 }
 
-// 4. Ajoutez la configuration pour Next.js
+// 4. Configuration Next.js
 if (Array.isArray(nextJsConfig)) {
   allConfigs.push(...nextJsConfig);
 } else {
   allConfigs.push(nextJsConfig);
 }
 
-// 5. Ajoutez la configuration pour les composants React internes/SDK
+// 5. Configuration React interne
 if (Array.isArray(reactInternalConfig)) {
   allConfigs.push(...reactInternalConfig);
 } else {
   allConfigs.push(reactInternalConfig);
 }
 
-// 6. Ajoutez la configuration de sécurité pour les fichiers de config
+// 6. Config de sécurité pour les fichiers de config
 allConfigs.push({
   files: ['eslint.config.js', 'packages/eslint-config/*.js'],
   rules: {
     '@typescript-eslint/no-unused-vars': 'off',
     'no-unused-vars': 'off',
+    '@next/next/no-html-link-for-pages': 'off',
   },
 });
 

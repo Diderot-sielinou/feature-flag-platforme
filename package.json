@@ -17,8 +17,9 @@
   "scripts": {
     "// ---- DEV ----": "",
     "dev": "turbo run dev --parallel",
-    "dev:api": "turbo run dev --filter=api-*^",
+    "dev:api": "turbo run dev --filter=\"api-*\" --parallel",
     "dev:dashboard": "turbo run dev --filter=dashboard",
+    "dev:api-manage": "turbo run dev --filter=api-management",
     "// ---- BUILD & TEST ----": "",
     "build": "turbo run build",
     "test": "turbo run test --parallel",

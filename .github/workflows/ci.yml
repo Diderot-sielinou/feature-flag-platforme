@@ -259,11 +259,27 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Retrieve Service Names
+        id: service-names
+        run: |
+          MGNT_SVC_NAME=$(aws cloudformation describe-stacks \
+            --stack-name FeatureFlagsComputeStack \
+            --query 'Stacks[0].Outputs[?OutputKey==`ManagementServiceName`].OutputValue' \
+            --output text)
+
+          READ_SVC_NAME=$(aws cloudformation describe-stacks \
+            --stack-name FeatureFlagsComputeStack \
+            --query 'Stacks[0].Outputs[?OutputKey==`ReadServiceName`].OutputValue' \
+            --output text)
+            
+          echo "MANAGEMENT_SERVICE_NAME=$MGNT_SVC_NAME" >> $GITHUB_ENV
+          echo "READ_SERVICE_NAME=$READ_SVC_NAME" >> $GITHUB_ENV
+
       - name: Force new deployment - Management Service
         run: |
           aws ecs update-service \
             --cluster ${{ env.CLUSTER_NAME }} \
-            --service ManagementService \
+            --service ${{ env.MANAGEMENT_SERVICE_NAME }}\
             --force-new-deployment \
             --query 'service.serviceName' \
             --output text
@@ -274,7 +290,7 @@ jobs:
         run: |
           aws ecs update-service \
             --cluster ${{ env.CLUSTER_NAME }} \
-            --service ReadService \
+            --service ${{ env.READ_SERVICE_NAME }} \
             --force-new-deployment \
             --query 'service.serviceName' \
             --output text
@@ -287,7 +303,7 @@ jobs:
 
           aws ecs wait services-stable \
             --cluster ${{ env.CLUSTER_NAME }} \
-            --services ManagementService ReadService \
+            --services ${{ env.MANAGEMENT_SERVICE_NAME }} ${{ env.READ_SERVICE_NAME }} \
             --region ${{ env.AWS_REGION }} \
             --cli-read-timeout 600 \
             --cli-connect-timeout 600

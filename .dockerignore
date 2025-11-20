@@ -63,3 +63,11 @@ Dockerfile*
 .cache/
 tmp/
 temp/
+
+# Dépendances
+node_modules
+
+
+# Scripts
+scripts
+*.sh

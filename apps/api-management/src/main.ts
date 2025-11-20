@@ -19,6 +19,8 @@ async function bootstrap() {
     }),
   );
 
+  app.setGlobalPrefix('api/v1/management/');
+
   // CORS (si nécessaire)
   app.enableCors({
     origin: true,
@@ -30,7 +32,9 @@ async function bootstrap() {
   await app.listen(port, '0.0.0.0'); // ⚠️ IMPORTANT: 0.0.0.0 pour Docker
 
   logger.log(`🚀 Management API running on port ${port}`);
-  logger.log(`🏥 Health check: http://localhost:${port}/health`);
+  logger.log(
+    `🏥 Health check: http://localhost:${port}/api/v1/management/health`,
+  );
   logger.log(`📝 Environment: ${process.env.NODE_ENV}`);
 }
 

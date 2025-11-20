@@ -89,6 +89,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3001
+      DATABASE_URL: postgresql://ffuser:ffpassword@postgres:5432/featureflags?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
       AWS_REGION: ${AWS_REGION:-us-east-1}

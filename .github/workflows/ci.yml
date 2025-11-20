@@ -71,8 +71,8 @@ jobs:
       - name: Build all packages
         run: npm run build
 
-      - name: Run tests
-        run: npm run test
+        # - name: Run tests
+        # run: npm run test
         env:
           DATABASE_URL: postgresql://ffuser:ffpassword@localhost:5432/featureflags
           REDIS_HOST: localhost

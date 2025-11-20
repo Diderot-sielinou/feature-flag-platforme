@@ -17,8 +17,12 @@ export const nestjsConfig = [
     languageOptions: {
       parser,
       parserOptions: {
-        project: ['./tsconfig.json', './apps/*/tsconfig.json', './packages/*/tsconfig.json'],
-        // eslint-disable-next-line no-undef
+        project: [
+          './tsconfig.json',
+          './tsconfig.base.json', // N'oubliez pas le base
+          './apps/*/tsconfig.json',
+          './packages/*/tsconfig.json',
+        ], // eslint-disable-next-line no-undef
         tsconfigRootDir: process.cwd(),
       },
     },

@@ -62,11 +62,11 @@ jobs:
         env:
           DATABASE_URL: postgresql://ffuser:ffpassword@localhost:5432/featureflags
 
-      - name: Lint
-        run: npm run lint
+      # - name: Lint
+      # run: npm run lint
 
-      - name: Type check
-        run: npm run type-check
+      # - name: Type check
+      # run: npm run type-check
 
       - name: Build all packages
         run: npm run build

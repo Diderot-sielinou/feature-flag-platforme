@@ -17,7 +17,13 @@ export const nestjsConfig = [
     languageOptions: {
       parser,
       parserOptions: {
-        project: ['./tsconfig.json', './apps/*/tsconfig.json', './packages/*/tsconfig.json'],
+        // ✅ Correction : Utiliser des chemins relatifs à la racine monorepo (./) pour la robustesse.
+        project: [
+          './tsconfig.base.json', // Ajout de la base
+          './apps/*/tsconfig.json',
+          './packages/*/tsconfig.json',
+          './apps/*/tsconfig.spec.json', // Critique pour les fichiers de test
+        ],
         // eslint-disable-next-line no-undef
         tsconfigRootDir: process.cwd(),
       },
@@ -51,6 +57,19 @@ export const nestjsConfig = [
       'security/detect-non-literal-fs-filename': 'warn',
       'security/detect-non-literal-require': 'warn',
       'security/detect-child-process': 'error',
+
+      'no-unused-expressions': 'off', // 1. Désactiver la règle JS
+      '@typescript-eslint/no-unused-expressions': [
+        'error',
+        {
+          allowShortCircuit: true,
+          allowTernary: true,
+          allowTaggedTemplates: true,
+          enforceForJSX: true,
+        },
+      ],
+      'no-return-await': 'off', // 1. Désactiver la règle JS
+      '@typescript-eslint/return-await': 'error', // 2. Activer la règle TS (plus sûr pour async)
     },
   },
 ];

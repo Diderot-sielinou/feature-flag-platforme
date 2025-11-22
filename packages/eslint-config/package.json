@@ -4,12 +4,14 @@
   "type": "module",
   "private": true,
   "exports": {
-    "./base": "./base.js",
-    "./next-js": "./next.js",
-    "./react-internal": "./react-internal.js",
     ".": "./base.js",
+    "./base": "./base.js",
+    "./nextjs": "./nextjs-app.js",
+    "./next-js": "./nextjs-app.js",
+    "./nextjs-app": "./nextjs-app.js",
+    "./nestjs": "./nestjs.js",
     "./nestjs.js": "./nestjs.js",
-    "./nextjs-app.js": "./nextjs-app.js"
+    "./react-internal": "./react-internal.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",

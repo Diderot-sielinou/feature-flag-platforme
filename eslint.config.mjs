@@ -1,3 +1,5 @@
+// eslint.config.mjs
+
 // Imports
 import { config as baseConfig } from './packages/eslint-config/base.js';
 import { nestjsConfig } from './packages/eslint-config/nestjs.js';
@@ -19,23 +21,29 @@ if (Array.isArray(baseConfig)) {
   allConfigs.push(baseConfig);
 }
 
-// 2. Résolution des alias / TS project paths
+// 2. Résolution des alias / TS project paths (FIX: Ajout de tsconfigRootDir)
 allConfigs.push({
   settings: {
     'import/resolver': {
       typescript: {
+        // ✅ Ajouté pour indiquer que la racine du projet est ici
+        tsconfigRootDir: import.meta.dirname, 
         project: [
-          'tsconfig.base.json',
-          'tsconfig.json',
+          './tsconfig.base.json',
+          // 'tsconfig.json', // ❌ Cette ligne est maintenant retirée
           'apps/*/tsconfig.json',
           'packages/*/tsconfig.json',
         ],
+      },
+      // ✅ AJOUTER le node resolver
+      node: {
+        extensions: ['.js', '.jsx', '.ts', '.tsx'],
       },
     },
   },
 });
 
-// 3. Configuration NestJS
+// 3. Configuration NestJS (s'applique par défaut à tous les fichiers .ts)
 if (Array.isArray(nestjsConfig)) {
   allConfigs.push(...nestjsConfig);
 } else {
@@ -43,28 +51,46 @@ if (Array.isArray(nestjsConfig)) {
 }
 
 // 4. Configuration Next.js
+// 🎯 Restreindre aux applications Next.js (web et dashboard)
+const nextJsFiles = ['apps/dashboard/**', 'apps/web/**'];
+
 if (Array.isArray(nextJsConfig)) {
-  allConfigs.push(...nextJsConfig);
+  for (const config of nextJsConfig) {
+    // S'assurer que les configurations Next.js ne s'appliquent qu'aux fichiers cibles
+    allConfigs.push({ ...config, files: nextJsFiles });
+  }
 } else {
-  allConfigs.push(nextJsConfig);
+  allConfigs.push({ ...nextJsConfig, files: nextJsFiles });
 }
 
 // 5. Configuration React interne
+// 🎯 Restreindre aux packages React (ui, web, dashboard)
+const reactInternalFiles = ['packages/ui/**', 'apps/dashboard/**', 'apps/web/**'];
+
 if (Array.isArray(reactInternalConfig)) {
-  allConfigs.push(...reactInternalConfig);
+  for (const config of reactInternalConfig) {
+    // S'assurer que les configurations React s'appliquent qu'aux fichiers cibles
+    allConfigs.push({ ...config, files: reactInternalFiles });
+  }
 } else {
-  allConfigs.push(reactInternalConfig);
+  allConfigs.push({ ...reactInternalConfig, files: reactInternalFiles });
 }
 
 // 6. Config de sécurité pour les fichiers de config
 allConfigs.push({
   files: ['eslint.config.js', 'packages/eslint-config/*.js'],
   rules: {
-    '@typescript-eslint/no-unused-vars': 'off',
-    'no-unused-vars': 'off',
-    '@next/next/no-html-link-for-pages': 'off',
+    'import/no-default-export': 'error',
   },
 });
 
-// --- Export final ---
+// Exemple de ré-application dans la configuration racine
+allConfigs.push({
+    files: ['**/*.ts', '**/*.tsx'],
+    rules: {
+        '@typescript-eslint/no-explicit-any': 'off',
+    },
+});
+
+// Exporter la configuration finale
 export default allConfigs;

@@ -53,7 +53,8 @@ RUN apk add --no-cache curl openssl
 WORKDIR /app
 
 # ✅ Copier le build
-COPY --from=builder /app/apps/api-management/dist ./dist
+# COPY --from=builder /app/apps/api-management/dist/ ./dist/
+COPY --from=builder /app/apps/api-management/dist/. ./dist
 COPY --from=builder /app/apps/api-management/package.json ./package.json
 
 # ✅ Copier TOUS les node_modules (incluant @nestjs/config)

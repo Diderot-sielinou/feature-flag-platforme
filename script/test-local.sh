@@ -156,9 +156,9 @@ test_health_checks() {
     log_info "Vérification des health checks..."
     
     # Test Management API
-    if curl -f -s http://localhost:3000/health > /dev/null; then
-        MGMT_RESPONSE=$(curl -s http://localhost:3000/health)
-        log_success "Management API (http://localhost:3000) : OK"
+    if curl -f -s http://localhost:3000/api/v1/management/health > /dev/null; then
+        MGMT_RESPONSE=$(curl -s http://localhost:3000/api/v1/management/health)
+        log_success "Management API (http://localhost:3000/api/v1/management/) : OK"
         echo "  Response: $MGMT_RESPONSE"
     else
         log_error "Management API : ÉCHEC. Le service ne répond pas au health check."

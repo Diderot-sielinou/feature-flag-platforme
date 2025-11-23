@@ -1,33 +1,23 @@
-// eslint-disable-next-line import/order
-import { nestjsConfig } from '@repo/eslint-config/nestjs.js';
+import { nestjsConfig } from '@repo/eslint-config/nestjs';
 
 /**
-
-* ESLint configuration for the NestJS `api-management` app
-
-* ✅ Extends the shared configuration of the @repo/eslint-config package
-
-* ✅ Compatible with CommonJS
-
-* ✅ Integrates proper TypeScript & Jest rules
-
-*/
-
+ * Configuration ESLint pour l'API Management (NestJS)
+ */
 export default [
   ...nestjsConfig,
   {
-    files: ['src/**/*.ts'],
     languageOptions: {
       parserOptions: {
-        project: './tsconfig.json',
+        project: './tsconfig.eslint.json',
         tsconfigRootDir: import.meta.dirname,
       },
     },
+  },
+  {
+    // Règles personnalisées pour cette app si nécessaire
     rules: {
-      '@typescript-eslint/no-floating-promises': 'warn',
-      '@typescript-eslint/explicit-function-return-type': 'off',
-      'import/order': 'off',
-      // '@typescript-eslint/no-explicit-any': 'off',
+      // Exemple : autoriser console.log en développement
+      // 'no-console': process.env.NODE_ENV === 'production' ? 'error' : 'off',
     },
   },
 ];

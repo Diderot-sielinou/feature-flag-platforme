@@ -1,16 +1,32 @@
 {
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "NestJS TypeScript Config",
   "extends": "./base.json",
   "compilerOptions": {
-    "target": "ES2021",
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "lib": ["ES2021"],
-    "strict": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "experimentalDecorators": true,
+    "target": "ES2022",
+    "lib": ["ES2022"],
+
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "removeComments": false,
+
     "emitDecoratorMetadata": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
-  }
+    "experimentalDecorators": true,
+
+    "strictPropertyInitialization": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["src/*"],
+      "@repo/shared": ["../../packages/shared/src"],
+      "@repo/database": ["../../packages/database/src"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "test", "**/*.spec.ts", "**/*.test.ts"]
 }

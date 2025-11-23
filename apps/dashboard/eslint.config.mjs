@@ -1,3 +1,10 @@
-import { nextJsConfig } from "@repo/eslint-config/nextjs";
+import { nextjsConfig } from "@repo/eslint-config/nextjs";
 
-export default [...nextJsConfig];
+export default [
+  ...nextjsConfig,
+  {
+    rules: {
+      "import/order": "off",
+    },
+  },
+];

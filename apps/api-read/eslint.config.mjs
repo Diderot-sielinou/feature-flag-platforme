@@ -1,20 +1,24 @@
-import { nestjsConfig } from '@repo/eslint-config/nestjs.js';
+import { nestjsConfig } from '@repo/eslint-config/nestjs';
 
+/**
+ * Configuration ESLint pour l'API Read (NestJS)
+ */
 export default [
   ...nestjsConfig,
   {
-    files: ['src/**/*.ts'],
     languageOptions: {
       parserOptions: {
-        project: './tsconfig.json',
+        project: './tsconfig.eslint.json',
         tsconfigRootDir: import.meta.dirname,
       },
     },
+  },
+  {
+    // Règles personnalisées pour cette app si nécessaire
     rules: {
-      '@typescript-eslint/no-floating-promises': 'warn',
-      '@typescript-eslint/explicit-function-return-type': 'off',
-      'import/order': 'off',
-      // '@typescript-eslint/no-explicit-any': 'off',
+      // L'API Read peut avoir des règles légèrement différentes
+      // Exemple : plus strict sur les promises
+      // '@typescript-eslint/no-floating-promises': 'error',
     },
   },
 ];

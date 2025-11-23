@@ -1,24 +1,20 @@
+// apps/api-management/tsconfig.json (Correction)
+
 {
-  "extends": "../../packages/typescript-config/nestjs.json",
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@repo/typescript-config/nestjs.json",
   "compilerOptions": {
-    "rootDir": "src",
-    "outDir": "dist",
-    "types": ["node", "jest"],
-    "module": "commonjs", // ✅ NestJS utilise CommonJS
-    "moduleResolution": "node",
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "ES2021",
-    "lib": ["ES2021"],
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "removeComments": false,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "strictPropertyInitialization": false
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["src/*"],
+      "@repo/shared": ["../../packages/shared/src"],
+      "@repo/database": ["../../packages/database/src"]
+    }
   },
-  // ✅ On inclut aussi les fichiers de test pour qu’ESLint/Jest puissent les lire
-  "include": ["src/**/*", "src/**/*.spec.ts", "src/**/*.test.ts"],
+  // ✅ Inclure toutes les sources et tous les tests pour l'IDE/ESLint/Jest
+  "include": ["src/**/*", "test/**/*", "**/*.ts"],
+  // ✅ N'exclure que les dossiers générés ou les dépendances (la compilation est gérée par tsconfig.build.json)
   "exclude": ["node_modules", "dist"]
 }

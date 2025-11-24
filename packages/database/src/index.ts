@@ -2,4 +2,4 @@
 export * from '@prisma/client';
 
 // Exporte le service Prisma injectable pour les applications NestJS
-export { PrismaService } from './PrismaService';
+export { PrismaService } from './PrismaService.js';

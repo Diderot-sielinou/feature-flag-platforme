@@ -1,8 +1,14 @@
 {
-  "extends": "@repo/typescript-config/react-library.json",
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@repo/typescript-config/react.json",
   "compilerOptions": {
-    "outDir": "dist"
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "jsx": "react-jsx"
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.spec.tsx", "**/*.test.tsx", "**/*.stories.tsx"]
 }

@@ -25,7 +25,10 @@ COPY packages/database/tsconfig.json ./packages/database/
 COPY packages/database/src/ ./packages/database/src/
 
 # ✅ ÉTAPE 2 : Installer toutes les dépendances (y compris workspaces)
-RUN npm ci --include-workspace-root --no-audit
+RUN npm install --include-workspace-root --no-audit
+
+# ✅ CORRECTION : Forcer la version TypeScript compatible
+RUN npm install -g typescript@5.3.3
 
 # ✅ ÉTAPE 3 : Maintenant copier tout le code source
 COPY packages ./packages
@@ -39,8 +42,11 @@ RUN npm run db:generate
 WORKDIR /app
 RUN npx turbo run build --filter=api-management
 
-# ✅ VÉRIFICATION : Lister ce qui a été construit
-RUN ls -la /app/apps/api-management/dist/
+# 🔍 VÉRIFICATION : Afficher la structure du build
+RUN echo "=== Structure du build ===" && \
+    ls -la /app/apps/api-management/dist/ && \
+    echo "=== Contenu détaillé ===" && \
+    find /app/apps/api-management/dist -type f
 
 # ================================
 # Stage 2: Production Runner
@@ -53,7 +59,8 @@ RUN apk add --no-cache curl openssl
 WORKDIR /app
 
 # ✅ Copier le build
-COPY --from=builder /app/apps/api-management/dist ./dist
+# COPY --from=builder /app/apps/api-management/dist/ ./dist/
+COPY --from=builder /app/apps/api-management/dist/. ./dist
 COPY --from=builder /app/apps/api-management/package.json ./package.json
 
 # ✅ Copier TOUS les node_modules (incluant @nestjs/config)

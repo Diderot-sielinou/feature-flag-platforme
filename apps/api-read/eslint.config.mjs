@@ -1,7 +1,7 @@
 import { nestjsConfig } from '@repo/eslint-config/nestjs';
 
 /**
- * Configuration ESLint pour l'API Management (NestJS)
+ * Configuration ESLint pour l'API Read (NestJS)
  */
 export default [
   ...nestjsConfig,
@@ -16,8 +16,9 @@ export default [
   {
     // Règles personnalisées pour cette app si nécessaire
     rules: {
-      // Exemple : autoriser console.log en développement
-      // 'no-console': process.env.NODE_ENV === 'production' ? 'error' : 'off',
+      // L'API Read peut avoir des règles légèrement différentes
+      // Exemple : plus strict sur les promises
+      // '@typescript-eslint/no-floating-promises': 'error',
     },
   },
 ];

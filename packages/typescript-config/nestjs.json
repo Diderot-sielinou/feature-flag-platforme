@@ -3,29 +3,26 @@
   "display": "NestJS TypeScript Config",
   "extends": "./base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022"],
+    "target": "ES2021",
+    "lib": ["ES2021"],
 
     "module": "CommonJS",
-    "moduleResolution": "Node",
+    "moduleResolution": "NodeNext",
 
     "outDir": "./dist",
     "rootDir": "./src",
-    "removeComments": false,
 
-    "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "useDefineForClassFields": false,
 
     "strictPropertyInitialization": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-
-    "baseUrl": "./",
-    "paths": {
-      "@/*": ["src/*"],
-      "@repo/shared": ["../../packages/shared/src"],
-      "@repo/database": ["../../packages/database/src"]
-    }
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "sourceMap": true,
+    "incremental": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "test", "**/*.spec.ts", "**/*.test.ts"]

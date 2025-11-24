@@ -6,13 +6,9 @@
     "rootDir": "./src",
     "composite": true,
     "declaration": true,
-    "declarationMap": true,
-    "lib": ["ES2022", "DOM"],
-    "baseUrl": "./",
-    "paths": {
-      "@/*": ["src/*"],
-      "@repo/shared": ["../shared/src"]
-    }
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "declarationMap": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts"]

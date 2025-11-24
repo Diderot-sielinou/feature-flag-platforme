@@ -69,11 +69,17 @@
     "prettier": "^3.1.0",
     "turbo": "^2.6.0",
     "typescript": "^5.3.0",
-    "typescript-eslint": "8.47.0"
+    "typescript-eslint": "8.47.0",
+    "undici-types": "^7.16.0"
   },
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
+  },
+  "overrides": {
+    "glob": "8.1.0",
+    "minimatch": "5.1.6",
+    "@types/glob": "8.1.0"
   },
   "packageManager": "npm@11.6.2",
   "lint-staged": {

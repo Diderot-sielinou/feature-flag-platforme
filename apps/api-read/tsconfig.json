@@ -1,5 +1,3 @@
-// apps/api-management/tsconfig.json (Correction)
-
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "@repo/typescript-config/nestjs.json",
@@ -7,14 +5,20 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "baseUrl": "./",
+
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "useDefineForClassFields": false,
+
     "paths": {
       "@/*": ["src/*"],
       "@repo/shared": ["../../packages/shared/src"],
       "@repo/database": ["../../packages/database/src"]
     }
   },
-  // ✅ Inclure toutes les sources et tous les tests pour l'IDE/ESLint/Jest
   "include": ["src/**/*", "test/**/*", "**/*.ts"],
-  // ✅ N'exclure que les dossiers générés ou les dépendances (la compilation est gérée par tsconfig.build.json)
   "exclude": ["node_modules", "dist"]
 }

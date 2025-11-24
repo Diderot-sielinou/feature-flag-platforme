@@ -19,6 +19,7 @@ export default [
       // L'API Read peut avoir des règles légèrement différentes
       // Exemple : plus strict sur les promises
       // '@typescript-eslint/no-floating-promises': 'error',
+
     },
   },
 ];

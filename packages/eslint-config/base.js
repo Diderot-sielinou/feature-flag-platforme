@@ -68,6 +68,7 @@ export const baseConfig = [
         typescript: {
           alwaysTryTypes: true,
           project: ['./tsconfig.json', './apps/*/tsconfig.json', './packages/*/tsconfig.json'],
+
         },
         node: {
           extensions: ['.js', '.jsx', '.ts', '.tsx'],

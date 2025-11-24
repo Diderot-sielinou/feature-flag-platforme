@@ -11,6 +11,7 @@ export const nestjsConfig = [
 
   {
     files: ['**/*.ts', '**/*.tsx'],
+
     rules: {
       // === NestJS Specific ===
       // Les constructeurs vides sont OK pour l'injection de dépendances

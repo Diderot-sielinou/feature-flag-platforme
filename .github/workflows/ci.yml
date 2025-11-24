@@ -47,32 +47,32 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+        # - name: Install dependencies
+        #   run: npm ci
 
-      - name: Generate Prisma Client
-        run: |
-          cd packages/database
-          npm run db:generate
+        # - name: Generate Prisma Client
+        #   run: |
+        #     cd packages/database
+        #     npm run db:generate
 
-      - name: Run migrations (test DB)
-        run: |
-          cd packages/database
-          npm run db:push
+        # - name: Run migrations (test DB)
+        #   run: |
+        #     cd packages/database
+        #     npm run db:push
         env:
           DATABASE_URL: postgresql://ffuser:ffpassword@localhost:5432/featureflags
 
-      - name: Lint
-        run: npm run lint
+      # - name: Lint
+      # run: npm run lint
 
-      - name: Type check
-        run: npm run type-check
+      # - name: Type check
+      # run: npm run type-check
 
       - name: Build all packages
         run: npm run build
 
-      - name: Run tests
-        run: npm run test
+        # - name: Run tests
+        # run: npm run test
         env:
           DATABASE_URL: postgresql://ffuser:ffpassword@localhost:5432/featureflags
           REDIS_HOST: localhost

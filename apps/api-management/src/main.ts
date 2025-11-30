@@ -29,7 +29,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
 
-  await app.listen(port, '0.0.0.0'); // ⚠️ IMPORTANT: 0.0.0.0 pour Docker
+  await app.listen(port, '0.0.0.0'); // ⚠️ IMPORTANT: 0.0.0.0 for Docker
 
   logger.log(`🚀 Management API running on port ${port}`);
   logger.log(

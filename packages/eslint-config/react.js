@@ -3,11 +3,13 @@ import pluginReact from 'eslint-plugin-react';
 import pluginReactHooks from 'eslint-plugin-react-hooks';
 
 /**
- * Configuration ESLint pour les bibliothèques React pures
- * (Sans Next.js - pour les UI libraries)
- *
- * @type {import("eslint").Linter.Config[]}
- */
+
+* ESLint configuration for pure React libraries
+* (Without Next.js - for UI libraries)
+*
+* @type {import("eslint").Linter.Config[]}
+
+*/
 export const reactConfig = [
   ...baseConfig,
 

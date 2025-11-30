@@ -72,7 +72,7 @@ export class NetworkStack extends cdk.Stack {
       'Allow PostgreSQL access from application',
     );
 
-    // Security Group pour ElastiCache Redis
+    // Security Group for ElastiCache Redis
     this.cacheSecurityGroup = new ec2.SecurityGroup(this, 'CacheSG', {
       vpc: this.vpc,
       description: 'Security group for ElastiCache Redis',

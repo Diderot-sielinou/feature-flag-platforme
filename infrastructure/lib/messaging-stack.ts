@@ -10,7 +10,7 @@ import * as targets from 'aws-cdk-lib/aws-events-targets';
 export interface MessagingStackProps extends cdk.StackProps {}
 
 /**
- * Stack responsable de la messagerie entre microservices :
+ * Stack responsible for messaging between microservices :
  * - EventBridge (bus interne)
  * - SNS (fan-out topic)
  * - SQS (queues de consommation)
@@ -25,14 +25,14 @@ export class MessagingStack extends cdk.Stack {
     super(scope, id, props);
 
     //
-    // 1️⃣ EventBridge Bus
+    // EventBridge Bus
     //
     this.eventBus = new events.EventBus(this, 'FeatureFlagsBus', {
       eventBusName: 'feature-flags-bus',
     });
 
     //
-    // 2️⃣ SNS Topic pour fan-out des évènements de flags
+    //  SNS Topic pour fan-out des évènements de flags
     //
     this.flagTopic = new sns.Topic(this, 'FlagTopic', {
       topicName: 'feature-flags-flag-updates',
@@ -40,7 +40,7 @@ export class MessagingStack extends cdk.Stack {
     });
 
     //
-    // 3️⃣ SQS Queues (Read + Analytics) avec DLQs
+    //  SQS Queues (Read + Analytics) avec DLQs
     //
     const readDlq = new sqs.Queue(this, 'ReadDLQ', {
       queueName: 'feature-flags-read-dlq',
@@ -73,13 +73,13 @@ export class MessagingStack extends cdk.Stack {
     });
 
     //
-    // 4️⃣ SNS Subscriptions : SNS -> SQS
+    //  SNS Subscriptions : SNS -> SQS
     //
     this.flagTopic.addSubscription(new subs.SqsSubscription(this.readQueue));
     this.flagTopic.addSubscription(new subs.SqsSubscription(this.analyticsQueue));
 
     //
-    // 5️⃣ EventBridge Rule : route les évènements "management.flags" vers SNS
+    //  EventBridge Rule : route les évènements "management.flags" vers SNS
     //
     new events.Rule(this, 'FlagEventsToSNS', {
       eventBus: this.eventBus,
@@ -91,7 +91,7 @@ export class MessagingStack extends cdk.Stack {
     });
 
     //
-    // 6️⃣ Permissions types (IAM policy templates)
+    //  Permissions types (IAM policy templates)
     //
     const publishPolicy = new iam.PolicyStatement({
       actions: ['sns:Publish', 'events:PutEvents'],
@@ -108,9 +108,6 @@ export class MessagingStack extends cdk.Stack {
       resources: [this.readQueue.queueArn, this.analyticsQueue.queueArn],
     });
 
-    //
-    // 7️⃣ Outputs pour les autres stacks
-    //
     new cdk.CfnOutput(this, 'EventBusName', {
       value: this.eventBus.eventBusName,
       exportName: 'FeatureFlagsEventBusName',

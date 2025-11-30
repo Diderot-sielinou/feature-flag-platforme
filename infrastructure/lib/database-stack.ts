@@ -30,12 +30,12 @@ export class DatabaseStack extends cdk.Stack {
       },
     });
 
-    // RDS PostgreSQL - AJUSTÉ POUR FREE TIER
+    // RDS PostgreSQL
     this.dbInstance = new rds.DatabaseInstance(this, 'PostgreSQLInstance', {
       engine: rds.DatabaseInstanceEngine.postgres({
         version: rds.PostgresEngineVersion.VER_15,
       }),
-      // 🚨 CORRECTION: Passer à T3.MICRO (Free Tier)
+      // use T3.MICRO (Free Tier)
       instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO),
       vpc: props.vpc,
       vpcSubnets: {
@@ -44,14 +44,13 @@ export class DatabaseStack extends cdk.Stack {
       securityGroups: [props.databaseSecurityGroup],
       credentials: rds.Credentials.fromSecret(this.dbSecret),
       databaseName: 'featureflags',
-      multiAz: false, // Correct pour Free Tier
-      allocatedStorage: 20, // 20GB est la limite minimale/Free Tier
-      maxAllocatedStorage: 100, // Une limite plus raisonnable
-      backupRetention: cdk.Duration.days(1), // Correct pour Free Tier
-      deletionProtection: false, // Désactivé pour faciliter les suppressions/tests
+      multiAz: false,
+      allocatedStorage: 20, // 20GB is the minimum limit/Free Tier
+      maxAllocatedStorage: 100,
+      backupRetention: cdk.Duration.days(1),
+      deletionProtection: false,
       storageEncrypted: true,
-      enablePerformanceInsights: false, // Désactivé pour Free Tier
-      // performanceInsightRetention: rds.PerformanceInsightRetention.DEFAULT,
+      enablePerformanceInsights: false,
     });
 
     // Subnet Group pour ElastiCache (inchangé)
@@ -66,25 +65,22 @@ export class DatabaseStack extends cdk.Stack {
     this.redisCluster = new elasticache.CfnReplicationGroup(this, 'RedisCluster', {
       replicationGroupDescription: 'Feature Flags Redis Cluster',
       engine: 'redis',
-      // 🚨 CORRECTION: Passer à cache.t3.micro (Free Tier)
+      // use cache.t3.micro (Free Tier)
       cacheNodeType: 'cache.t3.micro',
-      // 🚨 CORRECTION: Un seul cluster (Free Tier)
+      //  only one  cluster (Free Tier)
       numCacheClusters: 1,
-      // 🚨 CORRECTION: Désactiver pour un seul cluster
       automaticFailoverEnabled: false,
-      multiAzEnabled: false, // Désactiver pour un seul cluster
+      multiAzEnabled: false,
       cacheSubnetGroupName: subnetGroup.ref,
       securityGroupIds: [props.cacheSecurityGroup.securityGroupId],
       atRestEncryptionEnabled: false,
       transitEncryptionEnabled: false,
       engineVersion: '7.0',
-      snapshotRetentionLimit: 0, // Désactiver la rétention pour Free Tier
+      snapshotRetentionLimit: 0, //Disable retention for Free Tier
     });
 
-    // ⚠️ AJOUT: Politique de suppression pour éviter les blocages de rollback
     this.redisCluster.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
 
-    // Outputs (inchangés)
     new cdk.CfnOutput(this, 'DBEndpoint', {
       value: this.dbInstance.dbInstanceEndpointAddress,
       exportName: 'FeatureFlagsDBEndpoint',

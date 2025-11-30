@@ -5,13 +5,16 @@ import tseslint from 'typescript-eslint';
 import importPlugin from 'eslint-plugin-import';
 
 /**
- * Configuration ESLint de base pour le monorepo
- * Utilisée par tous les packages TypeScript
- *
- * @type {import("eslint").Linter.Config[]}
- */
+
+* Basic ESLint configuration for the monorepo
+
+* Used by all TypeScript packages
+
+* @type {import("eslint").Linter.Config[]}
+
+*/
 export const baseConfig = [
-  // 1. Ignorer les dossiers communs
+  // 1. Ignore shared folders
   {
     ignores: [
       '**/node_modules/**',
@@ -38,16 +41,16 @@ export const baseConfig = [
     },
   },
 
-  // 2. Configuration JavaScript de base
+  // 2. Basic JavaScript setup
   js.configs.recommended,
 
-  // 3. Configuration TypeScript recommandée
+  // 3. Basic typescript setup
   ...tseslint.configs.recommended,
 
-  // 4. Désactiver les règles conflictuelles avec Prettier
+  // 4. Disable conflicting rules with Prettier
   eslintConfigPrettier,
 
-  // 5. Configuration personnalisée
+  // 5. Custom configuration
   {
     plugins: {
       turbo: turboPlugin,
@@ -68,7 +71,6 @@ export const baseConfig = [
         typescript: {
           alwaysTryTypes: true,
           project: ['./tsconfig.json', './apps/*/tsconfig.json', './packages/*/tsconfig.json'],
-
         },
         node: {
           extensions: ['.js', '.jsx', '.ts', '.tsx'],
@@ -136,7 +138,7 @@ export const baseConfig = [
       'prefer-const': 'error',
       'no-var': 'error',
       eqeqeq: ['error', 'always', { null: 'ignore' }],
-      'no-duplicate-imports': 'off', // Géré par import/no-duplicates
+      'no-duplicate-imports': 'off',
     },
   },
 ];

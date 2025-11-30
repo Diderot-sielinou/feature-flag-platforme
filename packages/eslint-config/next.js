@@ -40,8 +40,8 @@ export const nextjsConfig = [
 
     rules: {
       // === React ===
-      'react/react-in-jsx-scope': 'off', // Next.js 13+ n'en a pas besoin
-      'react/prop-types': 'off', // On utilise TypeScript
+      'react/react-in-jsx-scope': 'off',
+      'react/prop-types': 'off', // use  TypeScript
       'react/jsx-no-target-blank': 'error',
       'react/jsx-key': 'error',
       'react/no-unescaped-entities': 'warn',
@@ -88,7 +88,7 @@ export const nextjsConfig = [
       'import/no-anonymous-default-export': 'warn',
 
       // === Console ===
-      // Plus strict en frontend
+      // Stricter on the front end
       'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },
@@ -96,13 +96,13 @@ export const nextjsConfig = [
   {
     files: ['**/*.tsx'],
     rules: {
-      // Règles spécifiques aux composants React
+      // Rules specific to React components
       '@typescript-eslint/no-empty-function': 'off',
     },
   },
 
   {
-    // Configuration pour les fichiers de configuration Next.js
+    // Configuration for Next.js configuration files
     files: ['next.config.js', 'next.config.mjs', 'next.config.ts'],
     rules: {
       '@typescript-eslint/no-var-requires': 'off',
@@ -111,10 +111,10 @@ export const nextjsConfig = [
   },
 
   {
-    // Configuration pour les App Router
+    //Configuration for the App Router
     files: ['**/app/**/*.tsx', '**/app/**/*.ts'],
     rules: {
-      'import/no-default-export': 'off', // App Router nécessite des exports par défaut
+      'import/no-default-export': 'off', // App Router requires default exports
     },
   },
 ];

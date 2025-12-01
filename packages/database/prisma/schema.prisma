@@ -1,5 +1,10 @@
+// =============================================================================
+// LaunchLayer - Feature Flags Platform
+// Database Schema (Prisma) - 15 Tables
+// =============================================================================
+
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["driverAdapters"]
 }
 
@@ -8,110 +13,15 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
-// ==========================================
-// 1. USER - Administrateurs de la Plateforme
-// ==========================================
-
-model User {
-  id              String    @id @default(cuid())
-  cognitoId       String    @unique
-  email           String    @unique
-  
-  // Profil enrichi
-  firstName       String?
-  lastName        String?
-  avatar          String?
-  timezone        String?   @default("UTC")
-  locale          String?   @default("en")
-  
-  // Sécurité et statut
-  emailVerified   Boolean   @default(false)
-  lastLoginAt     DateTime?
-  loginCount      Int       @default(0)
-  status          UserStatus @default(ACTIVE)
-  
-  // Préférences
-  preferences     Json?     // { theme: "dark", notifications: true }
-  
-  // Timestamps
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime? // Soft delete
-  
-  // Relations
-  ownedProjects   Project[]         @relation("ProjectOwner")
-  projectMembers  ProjectMember[]
-  auditLogs       AuditLog[]
-  flags           Flag[]            // Flags dont user est owner
-  
-  @@index([email])
-  @@index([cognitoId])
-  @@index([status])
-  @@map("users")
-}
+// =============================================================================
+// ENUMS
+// =============================================================================
 
 enum UserStatus {
   ACTIVE
   SUSPENDED
   PENDING_VERIFICATION
   DELETED
-}
-
-// ==========================================
-// 2. PROJECT - Conteneur Principal
-// ==========================================
-
-model Project {
-  id                  String    @id @default(cuid())
-  
-  // Identification
-  name                String
-  key                 String    @unique  // Clé technique (ex: "mobile-app")
-  description         String?   @db.Text
-  
-  // Visuel
-  icon                String?   // URL ou emoji
-  color               String?   // Hex color pour UI
-  tags                String[]  // ["mobile", "production"]
-  
-  // Ownership
-  ownerId             String
-  owner               User      @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  
-  // Statut
-  status              ProjectStatus @default(ACTIVE)
-  archivedAt          DateTime?
-  
-  // Quotas (pour éviter les abus)
-  maxFlags            Int?      @default(100)
-  currentFlagCount    Int       @default(0)
-  
-  // Billing (si SaaS)
-  billingPlan         BillingPlan @default(FREE)
-  
-  // Paramètres personnalisés
-  settings            Json?
-  
-  // Timestamps
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  deletedAt           DateTime?
-  
-  // Relations
-  environments        Environment[]
-  flags               Flag[]
-  entities            Entity[]
-  auditLogs           AuditLog[]
-  members             ProjectMember[]
-  segments            Segment[]
-  webhooks            Webhook[]
-  
-  @@unique([ownerId, name]) // Un owner ne peut pas avoir 2 projets avec le même nom
-  @@index([ownerId])
-  @@index([key])
-  @@index([status])
-  @@map("projects")
 }
 
 enum ProjectStatus {
@@ -121,94 +31,17 @@ enum ProjectStatus {
 }
 
 enum BillingPlan {
-  FREE      // 5 flags, 10k evaluations/mois
-  STARTER   // 25 flags, 100k evaluations
-  PRO       // 100 flags, 1M evaluations
+  FREE       // 5 flags, 10k evaluations/mois
+  STARTER    // 25 flags, 100k evaluations
+  PRO        // 100 flags, 1M evaluations
   ENTERPRISE // Illimité
 }
 
-// ==========================================
-// 3. PROJECT_MEMBER - Collaboration
-// ==========================================
-
-model ProjectMember {
-  id          String      @id @default(cuid())
-  
-  projectId   String
-  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  userId      String
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // Rôle et permissions
-  role        ProjectRole @default(VIEWER)
-  
-  // Invitation
-  invitedBy   String?
-  invitedAt   DateTime    @default(now())
-  acceptedAt  DateTime?
-  
-  // Timestamps
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  
-  @@unique([projectId, userId])
-  @@index([userId])
-  @@index([projectId, role])
-  @@map("project_members")
-}
-
 enum ProjectRole {
-  OWNER       // Tous les droits + suppression projet
-  ADMIN       // Gestion complète sauf suppression
-  EDITOR      // Création/modification flags
-  VIEWER      // Lecture seule
-}
-
-// ==========================================
-// 4. ENVIRONMENT - Environnements
-// ==========================================
-
-model Environment {
-  id                  String   @id @default(cuid())
-  
-  projectId           String
-  project             Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  // Identification
-  name                String   // "Production US-East"
-  key                 String   // "prod-us-east"
-  type                EnvironmentType @default(DEVELOPMENT)
-  
-  // Metadata
-  description         String?
-  color               String?  // Pour UI
-  
-  // Configuration technique
-  baseUrl             String?  // URL de l'app dans cet env
-  
-  // Protection (pour production)
-  requireApproval     Boolean  @default(false)
-  protected           Boolean  @default(false)
-  
-  // Ordre d'affichage
-  sortOrder           Int      @default(0)
-  
-  // Statut
-  active              Boolean  @default(true)
-  
-  // Timestamps
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  
-  // Relations
-  flagStates          FlagEnvironmentState[]
-  apiKeys             ApiKey[]
-  
-  @@unique([projectId, key])
-  @@index([projectId])
-  @@index([projectId, type])
-  @@map("environments")
+  OWNER   // Tous les droits + suppression projet
+  ADMIN   // Gestion complète sauf suppression
+  EDITOR  // Création/modification flags
+  VIEWER  // Lecture seule
 }
 
 enum EnvironmentType {
@@ -219,121 +52,10 @@ enum EnvironmentType {
   CUSTOM
 }
 
-// ==========================================
-// 5. API_KEY - Clés d'API Avancées
-// ==========================================
-
-model ApiKey {
-  id                      String   @id @default(cuid())
-  
-  projectId               String
-  
-  envId                   String?
-  environment             Environment? @relation(fields: [envId], references: [id], onDelete: Cascade)
-  
-  // Clé et metadata
-  key                     String   @unique
-  name                    String   // "Production Mobile App"
-  description             String?
-  
-  // Permissions
-  scope                   ApiKeyScope @default(READ_ONLY)
-  
-  // Rate limiting
-  rateLimit               Int?     @default(1000)  // Requêtes/minute
-  
-  // Sécurité
-  lastUsedAt              DateTime?
-  usageCount              Int      @default(0)
-  ipWhitelist             String[] // IPs autorisées
-  
-  // Expiration
-  expiresAt               DateTime?
-  
-  // Rotation
-  rotatedFrom             String?  // ID de l'ancienne clé
-  rotatedAt               DateTime?
-  
-  // Statut
-  active                  Boolean  @default(true)
-  revokedAt               DateTime?
-  revokedBy               String?
-  
-  // Audit
-  createdBy               String
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
-  
-  @@index([envId])
-  @@index([key])
-  @@index([active, expiresAt])
-  @@map("api_keys")
-}
-
 enum ApiKeyScope {
-  READ_ONLY   // Seulement évaluation de flags
-  WRITE       // Peut modifier flags
-  ADMIN       // Tous les droits
-}
-
-// ==========================================
-// 6. FLAG - Feature Flags
-// ==========================================
-
-model Flag {
-  id                  String   @id @default(cuid())
-  
-  projectId           String
-  project             Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  // Identification
-  name                String   // Nom technique (ex: "new_checkout")
-  key                 String   // Clé unique lisible
-  
-  // Type de flag
-  type                FlagType @default(BOOLEAN)
-  
-  // Informations descriptives
-  title               String?  // Titre affiché
-  description         String?  @db.Text
-  
-  // Organisation
-  tags                String[] // ["checkout", "critical"]
-  category            String?  // "feature", "ops", "experiment"
-  
-  // Ownership
-  ownerId             String?
-  owner               User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  
-  // Lifecycle
-  lifecycle           FlagLifecycle @default(PERMANENT)
-  status              FlagStatus @default(ACTIVE)
-  
-  // Expiration (pour flags temporaires)
-  expiresAt           DateTime?
-  temporary           Boolean  @default(false)
-  maintainer          String?  // Responsable du cleanup
-  
-  // Documentation
-  jiraTicket          String?
-  docsUrl             String?
-  
-  // Timestamps
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  deletedAt           DateTime?
-  
-  // Relations
-  states              FlagEnvironmentState[]
-  variants            FlagVariant[]
-  schedules           FlagSchedule[]
-  
-  @@unique([projectId, key])
-  @@index([projectId])
-  @@index([projectId, status])
-  @@index([lifecycle])
-  @@index([expiresAt])
-  @@map("flags")
+  READ_ONLY // Seulement évaluation de flags
+  WRITE     // Peut modifier flags
+  ADMIN     // Tous les droits
 }
 
 enum FlagType {
@@ -345,262 +67,39 @@ enum FlagType {
 }
 
 enum FlagLifecycle {
-  PERMANENT    // Flag destiné à rester
-  TEMPORARY    // À supprimer après usage
-  EXPERIMENT   // Pour A/B testing
-  KILL_SWITCH  // Pour désactiver rapidement une feature
-  OPERATIONAL  // Contrôle opérationnel (throttling, etc.)
+  PERMANENT   // Flag destiné à rester
+  TEMPORARY   // À supprimer après usage
+  EXPERIMENT  // Pour A/B testing
+  KILL_SWITCH // Pour désactiver rapidement une feature
+  OPERATIONAL // Contrôle opérationnel (throttling, etc.)
 }
 
 enum FlagStatus {
   ACTIVE
-  DEPRECATED  // À supprimer bientôt
+  DEPRECATED // À supprimer bientôt
   ARCHIVED
   DELETED
 }
 
-// ==========================================
-// 7. FLAG_ENVIRONMENT_STATE - État par Env
-// ==========================================
-
-model FlagEnvironmentState {
-  id                  String   @id @default(cuid())
-  
-  flagId              String
-  flag                Flag     @relation(fields: [flagId], references: [id], onDelete: Cascade)
-  
-  envId               String
-  environment         Environment @relation(fields: [envId], references: [id], onDelete: Cascade)
-  
-  // État par défaut
-  defaultState        Boolean  @default(false)
-  
-  // Règles de ciblage (JSONB optimisé)
-  rules               Json     // Structure: { version, priority, entityList, attributeMatch, percentage }
-  rulesHash           String?  // MD5 hash pour détection de changements
-  
-  // Versioning
-  version             Int      @default(1)
-  
-  // Pour multivariate
-  offVariation        String?  // Quelle variant retourner quand OFF
-  
-  // Fallback en cas d'erreur
-  fallbackValue       Boolean  @default(false)
-  
-  // Rollout progressif global
-  rolloutPercentage   Int?     @default(100)
-  
-  // Métriques de performance
-  evaluationCount     Int      @default(0)
-  lastEvaluatedAt     DateTime?
-  avgEvaluationMs     Float?
-  
-  // Cache control
-  cacheStrategy       CacheStrategy @default(STANDARD)
-  cacheTTL            Int?     @default(300)  // Secondes
-  
-  // Master switch
-  enabled             Boolean  @default(false)
-  
-  // Timestamps
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  lastModifiedBy      String?
-  
-  // Relations
-  segments            FlagSegment[]
-  snapshots           FlagStateSnapshot[]
-  
-  @@unique([flagId, envId])
-  @@index([flagId])
-  @@index([envId])
-  @@index([enabled])
-  @@index([envId, enabled]) // Composite pour queries fréquentes
-  @@map("flag_environment_states")
-}
-
 enum CacheStrategy {
-  NO_CACHE     // Toujours évaluer en temps réel
-  STANDARD     // Cache avec TTL standard
-  AGGRESSIVE   // Cache longtemps
-  EDGE         // Cache au edge (CloudFront)
+  NO_CACHE   // Toujours évaluer en temps réel
+  STANDARD   // Cache avec TTL standard
+  AGGRESSIVE // Cache longtemps
+  EDGE       // Cache au edge (CloudFront)
 }
 
-// ==========================================
-// 8. FLAG_STATE_SNAPSHOT (Nouvelle Table)
-// ==========================================
-model FlagStateSnapshot {
-id          String   @id @default(cuid())
-stateId     String
-state       FlagEnvironmentState @relation(fields: [stateId], references: [id], onDelete: Cascade)
-version     Int
-defaultState Boolean
-rules       Json
-snapshotType SnapshotType
-createdBy   String
-reason      String?
-label       String?
-createdAt   DateTime @default(now())
-@@index([stateId, createdAt])
-@@index([stateId, version])
-@@map("flag_state_snapshots")
-}
 enum SnapshotType {
-MANUAL
-AUTO
-SCHEDULED
-PRE_DEPLOY
-}
-
-
-// ==========================================
-// 9. FLAG_VARIANT - Variants pour A/B Testing
-// ==========================================
-
-model FlagVariant {
-  id          String   @id @default(cuid())
-  
-  flagId      String
-  flag        Flag     @relation(fields: [flagId], references: [id], onDelete: Cascade)
-  
-  // Identification
-  key         String   // "control", "variant_a", "variant_b"
-  name        String   // "Version Originale", "Nouveau Design"
-  description String?
-  
-  // Valeur retournée
-  value       Json     // Peut être n'importe quoi: boolean, string, object
-  
-  // Distribution (poids pour allocation)
-  weight      Int      @default(0)  // Sur 100
-  
-  // Statut
-  active      Boolean  @default(true)
-  
-  // Ordre d'affichage
-  sortOrder   Int      @default(0)
-  
-  // Timestamps
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@unique([flagId, key])
-  @@index([flagId])
-  @@index([flagId, active])
-  @@map("flag_variants")
-}
-
-// ==========================================
-// 10. SEGMENT - Segments Réutilisables
-// ==========================================
-
-model Segment {
-  id          String   @id @default(cuid())
-  
-  projectId   String
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  // Identification
-  key         String   // "premium_users", "beta_testers"
-  name        String
-  description String?
-  
-  // Règles du segment
-  rules       Json     // Structure similaire aux règles de flag
-  
-  // Metadata visuelle
-  color       String?
-  icon        String?
-  
-  // Statut
-  active      Boolean  @default(true)
-  
-  // Timestamps
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  createdBy   String
-  
-  // Relations
-  flagSegments FlagSegment[]
-  
-  @@unique([projectId, key])
-  @@index([projectId])
-  @@index([projectId, active])
-  @@map("segments")
-}
-
-// ==========================================
-// 11. FLAG_SEGMENT - Liaison Flag + Segment
-// ==========================================
-
-model FlagSegment {
-  id          String   @id @default(cuid())
-  
-  stateId     String
-  state       FlagEnvironmentState @relation(fields: [stateId], references: [id], onDelete: Cascade)
-  
-  segmentId   String
-  segment     Segment  @relation(fields: [segmentId], references: [id], onDelete: Cascade)
-  
-  // Variation à servir pour ce segment
-  variation   String?  // null = suivre defaultState, sinon variant key
-  
-  // Ordre de priorité (segments évalués dans l'ordre)
-  priority    Int      @default(0)
-  
-  // Timestamps
-  createdAt   DateTime @default(now())
-  
-  @@unique([stateId, segmentId])
-  @@index([stateId])
-  @@index([segmentId])
-  @@map("flag_segments")
-}
-
-// ==========================================
-// 12. FLAG_SCHEDULE - Programmation
-// ==========================================
-
-model FlagSchedule {
-  id          String   @id @default(cuid())
-  
-  flagId      String
-  flag        Flag     @relation(fields: [flagId], references: [id], onDelete: Cascade)
-  
-  envId       String
-  
-  // Action à exécuter
-  action      ScheduleAction
-  targetState Json     // Nouvel état à appliquer
-  
-  // Timing
-  scheduledAt DateTime
-  executedAt  DateTime?
-  
-  // Metadata
-  createdBy   String
-  reason      String?
-  
-  // Statut
-  status      ScheduleStatus @default(PENDING)
-  errorMessage String?
-  
-  // Timestamps
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@index([flagId, scheduledAt])
-  @@index([status, scheduledAt])
-  @@index([envId, scheduledAt])
-  @@map("flag_schedules")
+  MANUAL
+  AUTO
+  SCHEDULED
+  PRE_DEPLOY
 }
 
 enum ScheduleAction {
-  ENABLE        // Activer le flag
-  DISABLE       // Désactiver le flag
-  UPDATE_RULES  // Modifier les règles
-  DELETE        // Supprimer le flag
+  ENABLE       // Activer le flag
+  DISABLE      // Désactiver le flag
+  UPDATE_RULES // Modifier les règles
+  DELETE       // Supprimer le flag
 }
 
 enum ScheduleStatus {
@@ -608,52 +107,6 @@ enum ScheduleStatus {
   EXECUTED
   FAILED
   CANCELLED
-}
-
-// ==========================================
-// 13. ENTITY - Utilisateurs Finaux
-// ==========================================
-
-model Entity {
-  id                  String      @id // Client-provided ID
-  
-  projectId           String
-  project             Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  // Type d'entité
-  type                EntityType  @default(USER)
-  
-  // Attributs flexibles (JSONB)
-  attributes          Json
-  
-  // Attributs communs indexés (pour recherche rapide)
-  email               String?
-  name                String?
-  country             String?
-  plan                String?
-  
-  // Metadata
-  firstSeenAt         DateTime    @default(now())
-  lastSeenAt          DateTime    @default(now())
-  seenCount           Int         @default(1)
-  
-  // Segments auxquels appartient l'entité (cache)
-  segmentKeys         String[]
-  
-  // Statut
-  active              Boolean     @default(true)
-  
-  // Timestamps
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
-  
-  @@index([projectId])
-  @@index([projectId, type])
-  @@index([email])
-  @@index([country])
-  @@index([plan])
-  @@index([lastSeenAt])
-  @@map("entities")
 }
 
 enum EntityType {
@@ -664,90 +117,12 @@ enum EntityType {
   CUSTOM
 }
 
-// ==========================================
-// 14. AUDIT_LOG - Journal d'Audit Complet
-// ==========================================
-
-model AuditLog {
-  id                  String   @id @default(cuid())
-  
-  // Projet concerné
-  projectId           String
-  project             Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  // Acteur (qui a fait l'action)
-  actorId             String
-  actor               User     @relation(fields: [actorId], references: [id], onDelete: Cascade)
-  actorType           ActorType @default(USER)
-  
-  // Action effectuée
-  action              String   // "flag_created", "rules_updated", "flag_toggled"
-  category            AuditCategory @default(FLAG_CHANGE)
-  
-  // Cible (sur quoi)
-  targetType          String   // "flag", "environment", "entity"
-  targetId            String
-  targetName          String?  // Nom lisible
-  
-  // Environnement (si applicable)
-  envId               String?
-  envName             String?
-  
-  // Changement (before/after)
-  beforeState         Json?
-  afterState          Json?
-  diff                Json?    // Différence calculée
-  
-  // Payload additionnel
-  payload             Json?
-  
-  // Context de la requête
-  requestId           String?  @unique
-  sessionId           String?
-  ipAddress           String?
-  userAgent           String?
-  
-  // Source et méthode
-  source              AuditSource @default(WEB)
-  method              String?  // HTTP method
-  path                String?
-  
-  // Résultat
-  status              AuditStatus @default(SUCCESS)
-  errorMessage        String?
-  
-  // Sévérité
-  severity            AuditSeverity @default(INFO)
-  
-  // Raison (compliance)
-  reason              String?
-  
-  // Durée d'exécution
-  durationMs          Int?
-  
-  // Timestamp
-  createdAt           DateTime @default(now())
-  
-  // Expiration (data retention)
-  expiresAt           DateTime?
-  
-  @@index([projectId, createdAt])
-  @@index([actorId, createdAt])
-  @@index([targetType, targetId])
-  @@index([action])
-  @@index([category, createdAt])
-  @@index([severity])
-  @@index([sessionId])
-  @@index([createdAt]) // Pour purge automatique
-  @@map("audit_logs")
-}
-
 enum ActorType {
-  USER          // Utilisateur humain
-  API_KEY       // Via API key
-  SYSTEM        // Action automatique
-  WEBHOOK       // Déclenché par webhook
-  SCHEDULED     // Action planifiée
+  USER      // Utilisateur humain
+  API_KEY   // Via API key
+  SYSTEM    // Action automatique
+  WEBHOOK   // Déclenché par webhook
+  SCHEDULED // Action planifiée
 }
 
 enum AuditCategory {
@@ -764,12 +139,12 @@ enum AuditCategory {
 }
 
 enum AuditSource {
-  WEB           // Dashboard web
-  API           // REST API
-  SDK           // Via SDK client
-  CLI           // Command line
-  MOBILE        // App mobile
-  SYSTEM        // Automatique
+  WEB    // Dashboard web
+  API    // REST API
+  SDK    // Via SDK client
+  CLI    // Command line
+  MOBILE // App mobile
+  SYSTEM // Automatique
 }
 
 enum AuditStatus {
@@ -788,51 +163,6 @@ enum AuditSeverity {
   ALERT
 }
 
-// ==========================================
-// 15. WEBHOOK - Intégrations Externes
-// ==========================================
-
-model Webhook {
-  id              String   @id @default(cuid())
-  
-  projectId       String
-  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  // Configuration
-  name            String
-  description     String?
-  url             String
-  
-  // Événements écoutés
-  events          WebhookEvent[]
-  
-  // Sécurité (HMAC signature)
-  secret          String
-  
-  // Headers personnalisés
-  headers         Json?
-  
-  // Retry policy
-  retryEnabled    Boolean  @default(true)
-  maxRetries      Int      @default(3)
-  timeout         Int      @default(5000)  // ms
-  
-  // Statut
-  active          Boolean  @default(true)
-  lastTriggeredAt DateTime?
-  lastStatus      WebhookStatus?
-  failureCount    Int      @default(0)
-  
-  // Metadata
-  createdBy       String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  @@index([projectId])
-  @@index([projectId, active])
-  @@map("webhooks")
-}
-
 enum WebhookEvent {
   FLAG_CREATED
   FLAG_UPDATED
@@ -847,4 +177,690 @@ enum WebhookStatus {
   SUCCESS
   FAILED
   TIMEOUT
+}
+
+// =============================================================================
+// 1. USER - Administrateurs de la Plateforme
+// =============================================================================
+
+model User {
+  id            String     @id @default(cuid())
+  cognitoId     String     @unique
+  email         String     @unique
+
+  // Profil enrichi
+  firstName     String?
+  lastName      String?
+  avatar        String?
+  timezone      String?    @default("UTC")
+  locale        String?    @default("en")
+
+  // Sécurité et statut
+  emailVerified Boolean    @default(false)
+  lastLoginAt   DateTime?
+  loginCount    Int        @default(0)
+  status        UserStatus @default(ACTIVE)
+
+  // Préférences
+  preferences   Json? // { theme: "dark", notifications: true }
+
+  // Timestamps
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  deletedAt     DateTime? // Soft delete
+
+  // Relations
+  ownedProjects  Project[]       @relation("ProjectOwner")
+  projectMembers ProjectMember[]
+  auditLogs      AuditLog[]
+  flags          Flag[]          @relation("FlagOwner")
+
+  @@index([email])
+  @@index([cognitoId])
+  @@index([status])
+  @@map("users")
+}
+
+// =============================================================================
+// 2. PROJECT - Conteneur Principal
+// =============================================================================
+
+model Project {
+  id               String        @id @default(cuid())
+
+  // Identification
+  name             String
+  key              String        @unique // Clé technique (ex: "mobile-app")
+  description      String?       @db.Text
+
+  // Visuel
+  icon             String? // URL ou emoji
+  color            String? // Hex color pour UI
+  tags             String[] // ["mobile", "production"]
+
+  // Ownership
+  ownerId          String
+  owner            User          @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // Statut
+  status           ProjectStatus @default(ACTIVE)
+  archivedAt       DateTime?
+
+  // Quotas (pour éviter les abus)
+  maxFlags         Int?          @default(100)
+  currentFlagCount Int           @default(0)
+
+  // Billing (si SaaS)
+  billingPlan      BillingPlan   @default(FREE)
+
+  // Paramètres personnalisés
+  settings         Json?
+
+  // Timestamps
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  deletedAt        DateTime?
+
+  // Relations
+  environments Environment[]
+  flags        Flag[]
+  entities     Entity[]
+  auditLogs    AuditLog[]
+  members      ProjectMember[]
+  segments     Segment[]
+  webhooks     Webhook[]
+
+  @@unique([ownerId, name]) // Un owner ne peut pas avoir 2 projets avec le même nom
+  @@index([ownerId])
+  @@index([key])
+  @@index([status])
+  @@map("projects")
+}
+
+// =============================================================================
+// 3. PROJECT_MEMBER - Collaboration
+// =============================================================================
+
+model ProjectMember {
+  id         String      @id @default(cuid())
+
+  projectId  String
+  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Rôle et permissions
+  role       ProjectRole @default(VIEWER)
+
+  // Invitation
+  invitedBy  String?
+  invitedAt  DateTime    @default(now())
+  acceptedAt DateTime?
+
+  // Timestamps
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@index([projectId, role])
+  @@map("project_members")
+}
+
+// =============================================================================
+// 4. ENVIRONMENT - Environnements
+// =============================================================================
+
+model Environment {
+  id              String          @id @default(cuid())
+
+  projectId       String
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Identification
+  name            String // "Production US-East"
+  key             String // "prod-us-east"
+  type            EnvironmentType @default(DEVELOPMENT)
+
+  // Metadata
+  description     String?
+  color           String? // Pour UI
+
+  // Configuration technique
+  baseUrl         String? // URL de l'app dans cet env
+
+  // Protection (pour production)
+  requireApproval Boolean         @default(false)
+  protected       Boolean         @default(false)
+
+  // Ordre d'affichage
+  sortOrder       Int             @default(0)
+
+  // Statut
+  active          Boolean         @default(true)
+
+  // Timestamps
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  flagStates FlagEnvironmentState[]
+  apiKeys    ApiKey[]
+
+  @@unique([projectId, key])
+  @@index([projectId])
+  @@index([projectId, type])
+  @@map("environments")
+}
+
+// =============================================================================
+// 5. API_KEY - Clés d'API Avancées
+// =============================================================================
+
+model ApiKey {
+  id          String       @id @default(cuid())
+
+  projectId   String
+
+  envId       String?
+  environment Environment? @relation(fields: [envId], references: [id], onDelete: Cascade)
+
+  // Clé et metadata
+  key         String       @unique
+  keyHash     String // Hashed version for validation
+  name        String // "Production Mobile App"
+  description String?
+
+  // Permissions
+  scope       ApiKeyScope  @default(READ_ONLY)
+
+  // Rate limiting
+  rateLimit   Int?         @default(1000) // Requêtes/minute
+
+  // Sécurité
+  lastUsedAt  DateTime?
+  usageCount  Int          @default(0)
+  ipWhitelist String[] // IPs autorisées
+
+  // Expiration
+  expiresAt   DateTime?
+
+  // Rotation
+  rotatedFrom String? // ID de l'ancienne clé
+  rotatedAt   DateTime?
+
+  // Statut
+  active      Boolean      @default(true)
+  revokedAt   DateTime?
+  revokedBy   String?
+
+  // Audit
+  createdBy   String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([envId])
+  @@index([key])
+  @@index([keyHash])
+  @@index([active, expiresAt])
+  @@map("api_keys")
+}
+
+// =============================================================================
+// 6. FLAG - Feature Flags
+// =============================================================================
+
+model Flag {
+  id          String        @id @default(cuid())
+
+  projectId   String
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Identification
+  name        String // Nom technique (ex: "new_checkout")
+  key         String // Clé unique lisible
+
+  // Type de flag
+  type        FlagType      @default(BOOLEAN)
+
+  // Informations descriptives
+  title       String? // Titre affiché
+  description String?       @db.Text
+
+  // Organisation
+  tags        String[] // ["checkout", "critical"]
+  category    String? // "feature", "ops", "experiment"
+
+  // Ownership
+  ownerId     String?
+  owner       User?         @relation("FlagOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  // Lifecycle
+  lifecycle   FlagLifecycle @default(PERMANENT)
+  status      FlagStatus    @default(ACTIVE)
+
+  // Expiration (pour flags temporaires)
+  expiresAt   DateTime?
+  temporary   Boolean       @default(false)
+  maintainer  String? // Responsable du cleanup
+
+  // Documentation
+  jiraTicket  String?
+  docsUrl     String?
+
+  // Timestamps
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+
+  // Relations
+  states    FlagEnvironmentState[]
+  variants  FlagVariant[]
+  schedules FlagSchedule[]
+
+  @@unique([projectId, key])
+  @@index([projectId])
+  @@index([projectId, status])
+  @@index([lifecycle])
+  @@index([expiresAt])
+  @@map("flags")
+}
+
+// =============================================================================
+// 7. FLAG_ENVIRONMENT_STATE - État par Env
+// =============================================================================
+
+model FlagEnvironmentState {
+  id                String        @id @default(cuid())
+
+  flagId            String
+  flag              Flag          @relation(fields: [flagId], references: [id], onDelete: Cascade)
+
+  envId             String
+  environment       Environment   @relation(fields: [envId], references: [id], onDelete: Cascade)
+
+  // État par défaut
+  defaultState      Boolean       @default(false)
+
+  // Règles de ciblage (JSONB optimisé)
+  rules             Json // Structure: { version, priority, entityList, attributeMatch, percentage }
+  rulesHash         String? // MD5 hash pour détection de changements
+
+  // Versioning
+  version           Int           @default(1)
+
+  // Pour multivariate
+  offVariation      String? // Quelle variant retourner quand OFF
+
+  // Fallback en cas d'erreur
+  fallbackValue     Boolean       @default(false)
+
+  // Rollout progressif global
+  rolloutPercentage Int?          @default(100)
+
+  // Métriques de performance
+  evaluationCount   Int           @default(0)
+  lastEvaluatedAt   DateTime?
+  avgEvaluationMs   Float?
+
+  // Cache control
+  cacheStrategy     CacheStrategy @default(STANDARD)
+  cacheTTL          Int?          @default(300) // Secondes
+
+  // Master switch
+  enabled           Boolean       @default(false)
+
+  // Timestamps
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  lastModifiedBy    String?
+
+  // Relations
+  segments  FlagSegment[]
+  snapshots FlagStateSnapshot[]
+
+  @@unique([flagId, envId])
+  @@index([flagId])
+  @@index([envId])
+  @@index([enabled])
+  @@index([envId, enabled]) // Composite pour queries fréquentes
+  @@map("flag_environment_states")
+}
+
+// =============================================================================
+// 8. FLAG_STATE_SNAPSHOT - Snapshots pour Rollback
+// =============================================================================
+
+model FlagStateSnapshot {
+  id           String               @id @default(cuid())
+
+  stateId      String
+  state        FlagEnvironmentState @relation(fields: [stateId], references: [id], onDelete: Cascade)
+
+  version      Int
+  defaultState Boolean
+  rules        Json
+
+  snapshotType SnapshotType
+  createdBy    String
+  reason       String?
+  label        String? // Label optionnel (ex: "Pre-release v2.0")
+
+  createdAt    DateTime             @default(now())
+
+  @@index([stateId, createdAt])
+  @@index([stateId, version])
+  @@map("flag_state_snapshots")
+}
+
+// =============================================================================
+// 9. FLAG_VARIANT - Variants pour A/B Testing
+// =============================================================================
+
+model FlagVariant {
+  id          String   @id @default(cuid())
+
+  flagId      String
+  flag        Flag     @relation(fields: [flagId], references: [id], onDelete: Cascade)
+
+  // Identification
+  key         String // "control", "variant_a", "variant_b"
+  name        String // "Version Originale", "Nouveau Design"
+  description String?
+
+  // Valeur retournée
+  value       Json // Peut être n'importe quoi: boolean, string, object
+
+  // Distribution (poids pour allocation)
+  weight      Int      @default(0) // Sur 100
+
+  // Statut
+  active      Boolean  @default(true)
+
+  // Ordre d'affichage
+  sortOrder   Int      @default(0)
+
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([flagId, key])
+  @@index([flagId])
+  @@index([flagId, active])
+  @@map("flag_variants")
+}
+
+// =============================================================================
+// 10. SEGMENT - Segments Réutilisables
+// =============================================================================
+
+model Segment {
+  id          String   @id @default(cuid())
+
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Identification
+  key         String // "premium_users", "beta_testers"
+  name        String
+  description String?
+
+  // Règles du segment
+  rules       Json // Structure similaire aux règles de flag
+
+  // Metadata visuelle
+  color       String?
+  icon        String?
+
+  // Statut
+  active      Boolean  @default(true)
+
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String
+
+  // Relations
+  flagSegments FlagSegment[]
+
+  @@unique([projectId, key])
+  @@index([projectId])
+  @@index([projectId, active])
+  @@map("segments")
+}
+
+// =============================================================================
+// 11. FLAG_SEGMENT - Liaison Flag + Segment
+// =============================================================================
+
+model FlagSegment {
+  id        String               @id @default(cuid())
+
+  stateId   String
+  state     FlagEnvironmentState @relation(fields: [stateId], references: [id], onDelete: Cascade)
+
+  segmentId String
+  segment   Segment              @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+
+  // Variation à servir pour ce segment
+  variation String? // null = suivre defaultState, sinon variant key
+
+  // Ordre de priorité (segments évalués dans l'ordre)
+  priority  Int                  @default(0)
+
+  // Timestamps
+  createdAt DateTime             @default(now())
+
+  @@unique([stateId, segmentId])
+  @@index([stateId])
+  @@index([segmentId])
+  @@map("flag_segments")
+}
+
+// =============================================================================
+// 12. FLAG_SCHEDULE - Programmation
+// =============================================================================
+
+model FlagSchedule {
+  id           String         @id @default(cuid())
+
+  flagId       String
+  flag         Flag           @relation(fields: [flagId], references: [id], onDelete: Cascade)
+
+  envId        String
+
+  // Action à exécuter
+  action       ScheduleAction
+  targetState  Json // Nouvel état à appliquer
+
+  // Timing
+  scheduledAt  DateTime
+  executedAt   DateTime?
+
+  // Metadata
+  createdBy    String
+  reason       String?
+
+  // Statut
+  status       ScheduleStatus @default(PENDING)
+  errorMessage String?
+
+  // Timestamps
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([flagId, scheduledAt])
+  @@index([status, scheduledAt])
+  @@index([envId, scheduledAt])
+  @@map("flag_schedules")
+}
+
+// =============================================================================
+// 13. ENTITY - Utilisateurs Finaux
+// =============================================================================
+
+model Entity {
+  id          String     @id // Client-provided ID
+
+  projectId   String
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Type d'entité
+  type        EntityType @default(USER)
+
+  // Attributs flexibles (JSONB)
+  attributes  Json
+
+  // Attributs communs indexés (pour recherche rapide)
+  email       String?
+  name        String?
+  country     String?
+  plan        String?
+
+  // Metadata
+  firstSeenAt DateTime   @default(now())
+  lastSeenAt  DateTime   @default(now())
+  seenCount   Int        @default(1)
+
+  // Segments auxquels appartient l'entité (cache)
+  segmentKeys String[]
+
+  // Statut
+  active      Boolean    @default(true)
+
+  // Timestamps
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([projectId])
+  @@index([projectId, type])
+  @@index([email])
+  @@index([country])
+  @@index([plan])
+  @@index([lastSeenAt])
+  @@map("entities")
+}
+
+// =============================================================================
+// 14. AUDIT_LOG - Journal d'Audit Complet
+// =============================================================================
+
+model AuditLog {
+  id           String        @id @default(cuid())
+
+  // Projet concerné
+  projectId    String
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Acteur (qui a fait l'action)
+  actorId      String
+  actor        User          @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  actorType    ActorType     @default(USER)
+
+  // Action effectuée
+  action       String // "flag_created", "rules_updated", "flag_toggled"
+  category     AuditCategory @default(FLAG_CHANGE)
+
+  // Cible (sur quoi)
+  targetType   String // "flag", "environment", "entity"
+  targetId     String
+  targetName   String? // Nom lisible
+
+  // Environnement (si applicable)
+  envId        String?
+  envName      String?
+
+  // Changement (before/after)
+  beforeState  Json?
+  afterState   Json?
+  diff         Json? // Différence calculée
+
+  // Payload additionnel
+  payload      Json?
+
+  // Context de la requête
+  requestId    String?       @unique
+  sessionId    String?
+  ipAddress    String?
+  userAgent    String?
+
+  // Source et méthode
+  source       AuditSource   @default(WEB)
+  method       String? // HTTP method
+  path         String?
+
+  // Résultat
+  status       AuditStatus   @default(SUCCESS)
+  errorMessage String?
+
+  // Sévérité
+  severity     AuditSeverity @default(INFO)
+
+  // Raison (compliance)
+  reason       String?
+
+  // Durée d'exécution
+  durationMs   Int?
+
+  // Timestamp
+  createdAt    DateTime      @default(now())
+
+  // Expiration (data retention)
+  expiresAt    DateTime?
+
+  @@index([projectId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([targetType, targetId])
+  @@index([action])
+  @@index([category, createdAt])
+  @@index([severity])
+  @@index([sessionId])
+  @@index([createdAt]) // Pour purge automatique
+  @@map("audit_logs")
+}
+
+// =============================================================================
+// 15. WEBHOOK - Intégrations Externes
+// =============================================================================
+
+model Webhook {
+  id              String         @id @default(cuid())
+
+  projectId       String
+  project         Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Configuration
+  name            String
+  description     String?
+  url             String
+
+  // Événements écoutés
+  events          WebhookEvent[]
+
+  // Sécurité (HMAC signature)
+  secret          String
+
+  // Headers personnalisés
+  headers         Json?
+
+  // Retry policy
+  retryEnabled    Boolean        @default(true)
+  maxRetries      Int            @default(3)
+  timeout         Int            @default(5000) // ms
+
+  // Statut
+  active          Boolean        @default(true)
+  lastTriggeredAt DateTime?
+  lastStatus      WebhookStatus?
+  failureCount    Int            @default(0)
+
+  // Metadata
+  createdBy       String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([projectId])
+  @@index([projectId, active])
+  @@map("webhooks")
 }

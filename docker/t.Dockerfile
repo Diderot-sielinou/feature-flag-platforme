@@ -1,55 +1,120 @@
-# ================================
-# api-management.Dockerfile - AVEC CACHE HÔTE
-# ================================
-FROM node:20-alpine AS builder
+version: '3.8'
 
-WORKDIR /app
+services:
+  # ==========================================================================
+  # PostgreSQL Database
+  # ==========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: launchlayer-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: featureflags
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - launchlayer-network
 
-# Configuration DNS et réseau améliorée
-RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf && \
-    echo "nameserver 8.8.4.4" >> /etc/resolv.conf
+  # ==========================================================================
+  # Redis Cache
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: launchlayer-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - launchlayer-network
 
-# ✅ Copier TOUS les fichiers nécessaires D'ABORD
-COPY package.json package-lock.json turbo.json ./
-COPY packages ./packages
-COPY apps/api-management ./apps/api-management
-COPY apps/api-read/package.json ./apps/api-read/
+  # ==========================================================================
+  # Redis Commander (Debug UI)
+  # ==========================================================================
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: launchlayer-redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - launchlayer-network
 
-# ✅ SOLUTION : Copier node_modules depuis l'hôte (déjà installé)
-# Cela évite complètement npm ci dans Docker
-COPY node_modules ./node_modules
+  # ==========================================================================
+  # Management API (optional - can run locally)
+  # ==========================================================================
+  api-management:
+    build:
+      context: .
+      dockerfile: apps/api-management/Dockerfile
+    container_name: launchlayer-api-management
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/featureflags
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: local-dev-secret-change-in-production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - launchlayer-network
+    profiles:
+      - full
 
-# ✅ Générer Prisma Client
-WORKDIR /app/packages/database
-RUN npm run db:generate
+  # ==========================================================================
+  # Read API (optional - can run locally)
+  # ==========================================================================
+  api-read:
+    build:
+      context: .
+      dockerfile: apps/api-read/Dockerfile
+    container_name: launchlayer-api-read
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/featureflags
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - launchlayer-network
+    profiles:
+      - full
 
-# ✅ Build via Turbo
-WORKDIR /app
-RUN npx turbo run build --filter=api-management
+volumes:
+  postgres_data:
+  redis_data:
 
-# Vérification
-RUN ls -la /app/apps/api-management/dist/
-
-# ================================
-# Stage 2: Production Runner
-# ================================
-FROM node:20-alpine AS runner
-
-RUN apk add --no-cache curl openssl
-
-WORKDIR /app
-
-COPY --from=builder /app/apps/api-management/dist ./dist
-COPY --from=builder /app/apps/api-management/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages ./packages
-
-ENV NODE_ENV=production
-ENV PORT=3000
-
-EXPOSE 3000
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:3000/health || exit 1
-
-CMD ["node", "dist/main.js"]
+networks:
+  launchlayer-network:
+    driver: bridge

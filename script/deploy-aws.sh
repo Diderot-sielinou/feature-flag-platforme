@@ -104,6 +104,9 @@ deploy_base_infrastructure() {
     
     log_info "Déploiement de AuthStack..."
     npx cdk deploy FeatureFlagsAuthStack --require-approval never
+
+    log_info "Déploiement de emailStack..."
+    npx cdk deploy FeatureFlagsEmailStack --require-approval never
     
     log_info "Déploiement de MessagingStack..."
     npx cdk deploy FeatureFlagsMessagingStack --require-approval never

@@ -21,6 +21,13 @@ export default [
       '@typescript-eslint/no-explicit-any': 'warn',
     },
   },
+
+  {
+    rules: {
+      'no-console': 'off',
+    },
+  },
+
   {
     // Ignorer les fichiers générés par Prisma
     ignores: ['prisma/migrations/**', 'node_modules/@prisma/**'],

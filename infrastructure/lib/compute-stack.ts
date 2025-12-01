@@ -9,23 +9,47 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as appscaling from 'aws-cdk-lib/aws-applicationautoscaling';
 import { Construct } from 'constructs';
 
-interface ComputeStackProps extends cdk.StackProps {
+export interface ComputeStackProps extends cdk.StackProps {
+  // Network
   vpc: ec2.Vpc;
   applicationSecurityGroup: ec2.SecurityGroup;
   albSecurityGroup: ec2.SecurityGroup;
+
+  // Database
   dbSecret: secretsmanager.Secret;
   dbEndpoint: string;
   redisEndpoint: string;
+
+  // Auth
   userPoolId: string;
   userPoolClientId: string;
+
+  // Messaging
   flagTopicArn: string;
   readQueueArn: string;
   readQueueUrl: string;
   eventBusName: string;
+
+  // ECR
   managementEcr: ecr.Repository;
   readEcr: ecr.Repository;
+
+  // Email (SES)
+  sesIdentityArn: string;
+  senderEmail: string;
+
+  // Configuration
+  isProduction?: boolean;
 }
 
+/**
+ * Stack responsable du compute (ECS Fargate):
+ * - ECS Cluster
+ * - Task Definitions avec configurations optimisées
+ * - Fargate Services avec auto-scaling
+ * - Application Load Balancer avec routage
+ * - Support SSE (Server-Sent Events) optimisé
+ */
 export class ComputeStack extends cdk.Stack {
   public readonly cluster: ecs.Cluster;
   public readonly managementService: ecs.FargateService;
@@ -37,6 +61,9 @@ export class ComputeStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ComputeStackProps) {
     super(scope, id, props);
 
+    const isProduction = props.isProduction ?? false;
+
+    // Expose ECR repos
     this.managementEcr = props.managementEcr;
     this.readEcr = props.readEcr;
 
@@ -46,7 +73,8 @@ export class ComputeStack extends cdk.Stack {
     this.cluster = new ecs.Cluster(this, 'FeatureFlagsCluster', {
       vpc: props.vpc,
       clusterName: 'feature-flags-cluster',
-      containerInsights: true,
+      // Container Insights: activé seulement en prod pour réduire les coûts
+      containerInsights: isProduction,
     });
 
     // ========================================
@@ -54,17 +82,17 @@ export class ComputeStack extends cdk.Stack {
     // ========================================
     this.alb = new elbv2.ApplicationLoadBalancer(this, 'ALB', {
       vpc: props.vpc,
+      loadBalancerName: 'feature-flags-alb',
       internetFacing: true,
       securityGroup: props.albSecurityGroup,
       vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
-      deletionProtection: false,
-      // Augmenter le idle timeout de l'ALB lui-même pour SSE
-      // Par défaut 60s, on passe à 1 heure (3600s)
+      deletionProtection: isProduction,
+      // Idle timeout élevé pour SSE (1 heure)
       idleTimeout: cdk.Duration.seconds(3600),
     });
 
     // ========================================
-    // Target Groups avec Support SSE
+    // Target Groups
     // ========================================
 
     // Target Group Management - Configuration Standard
@@ -75,7 +103,7 @@ export class ComputeStack extends cdk.Stack {
       targetType: elbv2.TargetType.IP,
       targetGroupName: 'ff-management-tg',
       healthCheck: {
-        path: '/health',
+        path: '/api/v1/management/health',
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(5),
         healthyThresholdCount: 2,
@@ -83,10 +111,9 @@ export class ComputeStack extends cdk.Stack {
         healthyHttpCodes: '200',
       },
       deregistrationDelay: cdk.Duration.seconds(30),
-      // Idle timeout standard pour les requêtes courtes
     });
 
-    // Target Group Read - Configuration OPTIMISÉE pour SSE
+    // Target Group Read - Optimisé pour SSE
     const readTG = new elbv2.ApplicationTargetGroup(this, 'ReadTG', {
       vpc: props.vpc,
       port: 3001,
@@ -94,38 +121,27 @@ export class ComputeStack extends cdk.Stack {
       targetType: elbv2.TargetType.IP,
       targetGroupName: 'ff-read-tg',
       healthCheck: {
-        path: '/health',
-        // Health check moins fréquent pour ne pas perturber les connexions SSE
+        path: '/api/v1/health',
+        // Health check moins fréquent pour SSE
         interval: cdk.Duration.seconds(60),
         timeout: cdk.Duration.seconds(10),
         healthyThresholdCount: 2,
         unhealthyThresholdCount: 3,
         healthyHttpCodes: '200',
       },
-      // Déregistration rapide pour éviter de bloquer les deployments
       deregistrationDelay: cdk.Duration.seconds(10),
     });
 
+    // Configuration spéciale pour SSE
     const cfnReadTG = readTG.node.defaultChild as elbv2.CfnTargetGroup;
     cfnReadTG.addPropertyOverride('TargetGroupAttributes', [
-      {
-        Key: 'deregistration_delay.timeout_seconds',
-        Value: '10',
-      },
-      {
-        Key: 'slow_start.duration_seconds',
-        Value: '30',
-      },
-      // ⚡ ATTRIBUT ESSENTIEL POUR SSE ⚡
-      // Configure le timeout de connexion idle à 3600 secondes (1 heure)
-      {
-        Key: 'deregistration_delay.connection_termination.enabled',
-        Value: 'true',
-      },
+      { Key: 'deregistration_delay.timeout_seconds', Value: '10' },
+      { Key: 'slow_start.duration_seconds', Value: '30' },
+      { Key: 'deregistration_delay.connection_termination.enabled', Value: 'true' },
     ]);
 
     // ========================================
-    // Listener HTTP avec Routage Optimisé
+    // HTTP Listener avec Routage
     // ========================================
     const httpListener = this.alb.addListener('HTTPListener', {
       port: 80,
@@ -134,12 +150,12 @@ export class ComputeStack extends cdk.Stack {
         contentType: 'application/json',
         messageBody: JSON.stringify({
           error: 'Not Found',
-          message: 'Invalid endpoint. Use /api/v1/management/* or /api/v1/eval or /api/v1/sse/*',
+          message: 'Use /api/v1/management/* or /api/v1/eval or /api/v1/sse/*',
         }),
       }),
     });
 
-    // Règle pour Management API (priorité plus basse = évaluée en premier)
+    // Règle Management API
     httpListener.addTargetGroups('ManagementRule', {
       targetGroups: [managementTG],
       priority: 10,
@@ -147,12 +163,12 @@ export class ComputeStack extends cdk.Stack {
         elbv2.ListenerCondition.pathPatterns([
           '/api/v1/management/*',
           '/api/v1/management',
-          '/health', // Health check du load balancer
+          '/health',
         ]),
       ],
     });
 
-    // Règle pour Read API + SSE Endpoints
+    // Règle Read API + SSE
     httpListener.addTargetGroups('ReadRule', {
       targetGroups: [readTG],
       priority: 20,
@@ -161,7 +177,7 @@ export class ComputeStack extends cdk.Stack {
           '/api/v1/eval',
           '/api/v1/eval/*',
           '/api/v1/sse/*',
-          '/api/v1/flags/stream', // Route SSE alternative
+          '/api/v1/flags/stream',
         ]),
       ],
     });
@@ -170,20 +186,19 @@ export class ComputeStack extends cdk.Stack {
     // IAM Role for ECS Tasks
     // ========================================
     const taskRole = new iam.Role(this, 'ECSTaskRole', {
+      roleName: 'feature-flags-ecs-task-role',
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
       description: 'Role for Feature Flags ECS Tasks',
-      managedPolicies: [
-        // Permet l'exécution de commandes ECS Exec pour debugging
-        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'),
-      ],
+      managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore')],
     });
 
-    // Grant read access to DB secret
+    // Accès au secret de la base de données
     props.dbSecret.grantRead(taskRole);
 
-    // Permissions pour Management (SNS/EventBridge Publish)
+    // Permissions SNS/EventBridge (pour Management)
     taskRole.addToPolicy(
       new iam.PolicyStatement({
+        sid: 'AllowPublishEvents',
         effect: iam.Effect.ALLOW,
         actions: ['sns:Publish', 'events:PutEvents'],
         resources: [
@@ -193,9 +208,10 @@ export class ComputeStack extends cdk.Stack {
       }),
     );
 
-    // Permissions pour Read (SQS Consume)
+    // Permissions SQS (pour Read)
     taskRole.addToPolicy(
       new iam.PolicyStatement({
+        sid: 'AllowConsumeSQS',
         effect: iam.Effect.ALLOW,
         actions: [
           'sqs:ReceiveMessage',
@@ -207,53 +223,113 @@ export class ComputeStack extends cdk.Stack {
       }),
     );
 
-    // CloudWatch Logs permissions
+    // Permissions SES (pour l'envoi d'emails)
     taskRole.addToPolicy(
       new iam.PolicyStatement({
+        sid: 'AllowSendEmail',
+        effect: iam.Effect.ALLOW,
+        actions: ['ses:SendEmail', 'ses:SendRawEmail', 'ses:SendTemplatedEmail'],
+        resources: [
+          props.sesIdentityArn,
+          `arn:aws:ses:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:configuration-set/feature-flags-emails`,
+        ],
+      }),
+    );
+
+    // Permissions CloudWatch Logs
+    taskRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'AllowCloudWatchLogs',
         effect: iam.Effect.ALLOW,
         actions: ['logs:CreateLogStream', 'logs:PutLogEvents'],
         resources: ['*'],
       }),
     );
 
-    // ========================================
-    // Task Definitions & Container Setup
-    // ========================================
+    // ----------------------------------------------------------------------------------
+    // NOUVEAU : Accorder les permissions Cognito nécessaires pour GÉRER les utilisateurs
+    // et les GROUPES.
+    // L'API du service Management Fargate utilisera ce rôle.
+    // ----------------------------------------------------------------------------------
+    taskRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          'cognito-idp:AdminCreateUser',
+          'cognito-idp:AdminSetUserPassword',
+          'cognito-idp:AdminAddUserToGroup',
+          'cognito-idp:ListUsers',
+          'cognito-idp:ListGroups',
+          'cognito-idp:CreateGroup',
+          'cognito-idp:AdminGetUser',
+          'cognito-idp:AdminDeleteUser',
+          'cognito-idp:AdminDisableUser',
+          'cognito-idp:AdminEnableUser',
+        ],
+        resources: [
+          // Cibler spécifiquement le User Pool
+          cdk.Stack.of(this).formatArn({
+            service: 'cognito-idp',
+            resource: 'userpool',
+            resourceName: props.userPoolId,
+          }),
+          // Nécessaire si on administre aussi les groupes
+          cdk.Stack.of(this).formatArn({
+            service: 'cognito-idp',
+            resource: 'group',
+            resourceName: `${props.userPoolId}/*`, // Appliquer à tous les groupes du pool
+          }),
+        ],
+      }),
+    );
+    // ----------------------------------------------------------------------------------
 
-    // Log Groups avec rétention appropriée
+    // ========================================
+    // Log Groups
+    // ========================================
     const managementLogGroup = new logs.LogGroup(this, 'ManagementLogs', {
       logGroupName: '/ecs/feature-flags/management',
-      retention: logs.RetentionDays.ONE_WEEK,
+      retention: isProduction ? logs.RetentionDays.ONE_MONTH : logs.RetentionDays.ONE_WEEK,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
     const readLogGroup = new logs.LogGroup(this, 'ReadLogs', {
       logGroupName: '/ecs/feature-flags/read',
-      retention: logs.RetentionDays.ONE_WEEK,
+      retention: isProduction ? logs.RetentionDays.ONE_MONTH : logs.RetentionDays.ONE_WEEK,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    // ========================================
     // Task Definitions
+    // ========================================
+
+    // Task Definition Management
     const managementTaskDef = new ecs.FargateTaskDefinition(this, 'ManagementTaskDef', {
-      memoryLimitMiB: 512,
-      cpu: 1024,
-      taskRole: taskRole,
+      family: 'feature-flags-management',
+      // Réduction des coûts: 0.25 vCPU, 512MB en dev
+      cpu: isProduction ? 512 : 256,
+      memoryLimitMiB: isProduction ? 1024 : 512,
+      taskRole,
     });
 
+    // Task Definition Read
     const readTaskDef = new ecs.FargateTaskDefinition(this, 'ReadTaskDef', {
-      memoryLimitMiB: 512,
-      cpu: 1024,
-      taskRole: taskRole,
-      // Ephemeral storage pour les connexions SSE en mémoire
-      ephemeralStorageGiB: 21, // Minimum 21 GB
+      family: 'feature-flags-read',
+      // Plus de ressources pour le service Read (SSE)
+      cpu: isProduction ? 512 : 256,
+      memoryLimitMiB: isProduction ? 1024 : 512,
+      taskRole,
     });
 
-    // Database connection URL (for Prisma)
-    const databaseUrl = `postgresql://{{resolve:secretsmanager:${props.dbSecret.secretArn}:SecretString:username}}:{{resolve:secretsmanager:${props.dbSecret.secretArn}:SecretString:password}}@${props.dbEndpoint}:5432/featureflags?schema=public`;
+    // ========================================
+    // Database URL (construit depuis le secret)
+    // ========================================
+    const databaseUrl = `postgresql://\${${props.dbSecret.secretValueFromJson('username').unsafeUnwrap()}}:\${${props.dbSecret.secretValueFromJson('password').unsafeUnwrap()}}@${props.dbEndpoint}:5432/featureflags?schema=public`;
 
-    // Environment common variables
+    // ========================================
+    // Environment Variables
+    // ========================================
     const commonEnv = {
-      NODE_ENV: 'production',
+      NODE_ENV: isProduction ? 'production' : 'development',
       AWS_REGION: cdk.Aws.REGION,
       REDIS_HOST: props.redisEndpoint,
       REDIS_PORT: '6379',
@@ -262,41 +338,43 @@ export class ComputeStack extends cdk.Stack {
       EVENT_BUS_NAME: props.eventBusName,
       FLAG_TOPIC_ARN: props.flagTopicArn,
       READ_QUEUE_URL: props.readQueueUrl,
+      // SES Configuration
+      SES_SENDER_EMAIL: props.senderEmail,
+      SES_CONFIGURATION_SET: 'feature-flags-emails',
     };
 
     const managementEnv = {
       ...commonEnv,
-      DATABASE_URL: databaseUrl,
       PORT: '3000',
-      LOG_LEVEL: 'info',
+      LOG_LEVEL: isProduction ? 'info' : 'debug',
     };
 
     const readEnv = {
       ...commonEnv,
-      DATABASE_URL: databaseUrl,
       PORT: '3001',
-      LOG_LEVEL: 'info',
-      // Configuration spécifique SSE
-      SSE_KEEPALIVE_INTERVAL: '30000', // 30 secondes (en ms)
-      SSE_RETRY_TIMEOUT: '5000', // 5 secondes
-      MAX_SSE_CONNECTIONS: '10000', // Limite de connexions SSE simultanées
+      LOG_LEVEL: isProduction ? 'info' : 'debug',
+      // Configuration SSE
+      SSE_KEEPALIVE_INTERVAL: '30000',
+      SSE_RETRY_TIMEOUT: '5000',
+      MAX_SSE_CONNECTIONS: '10000',
     };
 
-    // Images ECS
-    const managementImage = ecs.ContainerImage.fromEcrRepository(props.managementEcr, 'latest');
-    const readImage = ecs.ContainerImage.fromEcrRepository(props.readEcr, 'latest');
+    // ========================================
+    // Container Definitions
+    // ========================================
 
-    // ----------------------------------------
     // Management Container
-    // ----------------------------------------
     managementTaskDef.addContainer('management-service', {
       containerName: 'management-service',
-      image: managementImage,
+      image: ecs.ContainerImage.fromEcrRepository(props.managementEcr, 'latest'),
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'management',
         logGroup: managementLogGroup,
       }),
       environment: managementEnv,
+      secrets: {
+        DATABASE_URL: ecs.Secret.fromSecretsManager(props.dbSecret, 'connectionString'),
+      },
       portMappings: [{ containerPort: 3000, protocol: ecs.Protocol.TCP }],
       healthCheck: {
         command: ['CMD-SHELL', 'curl -f http://localhost:3000/health || exit 1'],
@@ -305,24 +383,21 @@ export class ComputeStack extends cdk.Stack {
         retries: 3,
         startPeriod: cdk.Duration.seconds(60),
       },
-      // Limites de ressources
-      memoryReservationMiB: 1024,
-      cpu: 512,
     });
 
-    // ----------------------------------------
-    // Read Container - Optimisé pour SSE
-    // ----------------------------------------
+    // Read Container (optimisé pour SSE)
     readTaskDef.addContainer('read-service', {
       containerName: 'read-service',
-      image: readImage,
+      image: ecs.ContainerImage.fromEcrRepository(props.readEcr, 'latest'),
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'read',
         logGroup: readLogGroup,
-        // Mode non-blocking pour éviter de ralentir les connexions SSE
         mode: ecs.AwsLogDriverMode.NON_BLOCKING,
       }),
       environment: readEnv,
+      secrets: {
+        DATABASE_URL: ecs.Secret.fromSecretsManager(props.dbSecret, 'connectionString'),
+      },
       portMappings: [{ containerPort: 3001, protocol: ecs.Protocol.TCP }],
       healthCheck: {
         command: ['CMD-SHELL', 'curl -f http://localhost:3001/health || exit 1'],
@@ -331,10 +406,7 @@ export class ComputeStack extends cdk.Stack {
         retries: 3,
         startPeriod: cdk.Duration.seconds(60),
       },
-      // Ressources augmentées pour gérer les connexions SSE
-      memoryReservationMiB: 1536,
-      cpu: 768,
-      // Limites ulimit pour gérer beaucoup de connexions simultanées
+      // Ulimits pour beaucoup de connexions SSE
       ulimits: [
         {
           name: ecs.UlimitName.NOFILE,
@@ -347,37 +419,35 @@ export class ComputeStack extends cdk.Stack {
     // ========================================
     // Fargate Services
     // ========================================
+
+    // Management Service
     this.managementService = new ecs.FargateService(this, 'ManagementService', {
       cluster: this.cluster,
       taskDefinition: managementTaskDef,
-      desiredCount: 1,
+      serviceName: 'feature-flags-management',
+      // Réduction coûts: 1 instance en dev
+      desiredCount: isProduction ? 2 : 1,
       minHealthyPercent: 100,
       maxHealthyPercent: 200,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [props.applicationSecurityGroup],
       enableExecuteCommand: true,
-      serviceName: 'feature-flags-management',
-      // Circuit Breaker pour éviter les rollbacks infinis
-      circuitBreaker: {
-        rollback: true,
-      },
+      circuitBreaker: { rollback: true },
     });
 
+    // Read Service
     this.readService = new ecs.FargateService(this, 'ReadService', {
       cluster: this.cluster,
       taskDefinition: readTaskDef,
-      desiredCount: 1,
+      serviceName: 'feature-flags-read',
+      // Réduction coûts: 1 instance en dev
+      desiredCount: isProduction ? 2 : 1,
       minHealthyPercent: 100,
       maxHealthyPercent: 200,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [props.applicationSecurityGroup],
       enableExecuteCommand: true,
-      serviceName: 'feature-flags-read',
-      circuitBreaker: {
-        rollback: true,
-      },
-      // ⚡ IMPORTANT pour SSE: Permet le drainage des connexions
-      // Augmente le temps de drainage pour laisser les clients SSE se reconnecter
+      circuitBreaker: { rollback: true },
       healthCheckGracePeriod: cdk.Duration.seconds(60),
     });
 
@@ -386,99 +456,83 @@ export class ComputeStack extends cdk.Stack {
     readTG.addTarget(this.readService);
 
     // ========================================
-    // Auto Scaling - Optimisé pour SSE
+    // Auto Scaling (uniquement en production)
     // ========================================
+    if (isProduction) {
+      // Auto Scaling Read Service
+      const readScaling = this.readService.autoScaleTaskCount({
+        minCapacity: 2,
+        maxCapacity: 10,
+      });
 
-    // Auto Scaling pour Read Service (gérant les connexions SSE)
-    const readScaling = this.readService.autoScaleTaskCount({
-      minCapacity: 3,
-      maxCapacity: 20,
-    });
+      readScaling.scaleOnCpuUtilization('CpuScaling', {
+        targetUtilizationPercent: 75,
+        scaleInCooldown: cdk.Duration.seconds(300),
+        scaleOutCooldown: cdk.Duration.seconds(60),
+      });
 
-    // Scaling basé sur CPU - seuil plus élevé car SSE consomme peu de CPU
-    readScaling.scaleOnCpuUtilization('CpuScaling', {
-      targetUtilizationPercent: 75, // Augmenté de 70 à 75
-      scaleInCooldown: cdk.Duration.seconds(300), // 5 min - plus long pour SSE
-      scaleOutCooldown: cdk.Duration.seconds(60),
-    });
+      readScaling.scaleOnMemoryUtilization('MemoryScaling', {
+        targetUtilizationPercent: 70,
+        scaleInCooldown: cdk.Duration.seconds(300),
+        scaleOutCooldown: cdk.Duration.seconds(60),
+      });
 
-    // Scaling basé sur Memory - critique pour SSE (beaucoup de connexions)
-    readScaling.scaleOnMemoryUtilization('MemoryScaling', {
-      targetUtilizationPercent: 70, // Seuil bas car les connexions SSE consomment de la mémoire
-      scaleInCooldown: cdk.Duration.seconds(300), // 5 min
-      scaleOutCooldown: cdk.Duration.seconds(60),
-    });
+      // Auto Scaling Management Service
+      const managementScaling = this.managementService.autoScaleTaskCount({
+        minCapacity: 2,
+        maxCapacity: 6,
+      });
 
-    // ⚡ NOUVEAU: Scaling basé sur le nombre de connexions ALB
-    // Très utile pour SSE car une métrique directe du nombre de clients connectés
-    readScaling.scaleOnMetric('ConnectionScaling', {
-      metric: this.alb.metrics.targetConnectionErrorCount({
-        statistic: 'Average',
-      }),
-      scalingSteps: [
-        { upper: 100, change: -1 },
-        { lower: 500, change: +1 },
-        { lower: 1000, change: +2 },
-        { lower: 2000, change: +3 },
-      ],
-      adjustmentType: appscaling.AdjustmentType.CHANGE_IN_CAPACITY,
-    });
-
-    // Auto Scaling pour Management Service
-    const managementScaling = this.managementService.autoScaleTaskCount({
-      minCapacity: 2,
-      maxCapacity: 10,
-    });
-
-    managementScaling.scaleOnCpuUtilization('ManagementCpuScaling', {
-      targetUtilizationPercent: 70,
-      scaleInCooldown: cdk.Duration.seconds(60),
-      scaleOutCooldown: cdk.Duration.seconds(60),
-    });
-
-    managementScaling.scaleOnMemoryUtilization('ManagementMemoryScaling', {
-      targetUtilizationPercent: 80,
-      scaleInCooldown: cdk.Duration.seconds(60),
-      scaleOutCooldown: cdk.Duration.seconds(60),
-    });
+      managementScaling.scaleOnCpuUtilization('ManagementCpuScaling', {
+        targetUtilizationPercent: 70,
+        scaleInCooldown: cdk.Duration.seconds(60),
+        scaleOutCooldown: cdk.Duration.seconds(60),
+      });
+    }
 
     // ========================================
     // Outputs
     // ========================================
     new cdk.CfnOutput(this, 'ALBDNSName', {
       value: this.alb.loadBalancerDnsName,
-      description: 'DNS Name of the Application Load Balancer',
+      description: 'Application Load Balancer DNS Name',
       exportName: 'FeatureFlagsALBDNS',
-    });
-
-    new cdk.CfnOutput(this, 'SSEEndpoint', {
-      value: `http://${this.alb.loadBalancerDnsName}/api/v1/sse/subscribe`,
-      description: 'SSE Endpoint for SDK connections',
-    });
-
-    new cdk.CfnOutput(this, 'EvalEndpoint', {
-      value: `http://${this.alb.loadBalancerDnsName}/api/v1/eval`,
-      description: 'Flag Evaluation API Endpoint',
     });
 
     new cdk.CfnOutput(this, 'ManagementEndpoint', {
       value: `http://${this.alb.loadBalancerDnsName}/api/v1/management`,
       description: 'Management API Endpoint',
+      exportName: 'FeatureFlagsManagementEndpoint',
+    });
+
+    new cdk.CfnOutput(this, 'EvalEndpoint', {
+      value: `http://${this.alb.loadBalancerDnsName}/api/v1/eval`,
+      description: 'Flag Evaluation API Endpoint',
+      exportName: 'FeatureFlagsEvalEndpoint',
+    });
+
+    new cdk.CfnOutput(this, 'SSEEndpoint', {
+      value: `http://${this.alb.loadBalancerDnsName}/api/v1/sse/subscribe`,
+      description: 'SSE Streaming Endpoint',
+      exportName: 'FeatureFlagsSSEEndpoint',
+    });
+
+    new cdk.CfnOutput(this, 'ClusterName', {
+      value: this.cluster.clusterName,
+      description: 'ECS Cluster Name',
+      exportName: 'FeatureFlagsClusterName',
     });
 
     new cdk.CfnOutput(this, 'ManagementServiceName', {
       value: this.managementService.serviceName,
+      description: 'Management ECS Service Name',
       exportName: 'FeatureFlagsManagementServiceName',
     });
 
     new cdk.CfnOutput(this, 'ReadServiceName', {
       value: this.readService.serviceName,
+      description: 'Read ECS Service Name',
       exportName: 'FeatureFlagsReadServiceName',
-    });
-
-    new cdk.CfnOutput(this, 'ClusterName', {
-      value: this.cluster.clusterName,
-      exportName: 'FeatureFlagsClusterName',
     });
   }
 }

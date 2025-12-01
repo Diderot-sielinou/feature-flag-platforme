@@ -132,9 +132,9 @@ export const baseConfig = [
       ],
 
       // === Code Quality ===
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
-      'no-debugger': 'warn',
-      'no-alert': 'warn',
+      'no-console': 'off',
+      'no-debugger': 'off',
+      'no-alert': 'off',
       'prefer-const': 'error',
       'no-var': 'error',
       eqeqeq: ['error', 'always', { null: 'ignore' }],

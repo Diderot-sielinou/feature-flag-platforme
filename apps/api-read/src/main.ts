@@ -19,6 +19,8 @@ async function bootstrap() {
     }),
   );
 
+  app.setGlobalPrefix('api/v1/');
+
   // CORS (si nécessaire)
   app.enableCors({
     origin: true,

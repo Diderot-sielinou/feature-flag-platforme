@@ -6,7 +6,6 @@ import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
-import * as appscaling from 'aws-cdk-lib/aws-applicationautoscaling';
 import { Construct } from 'constructs';
 
 export interface ComputeStackProps extends cdk.StackProps {
@@ -121,8 +120,7 @@ export class ComputeStack extends cdk.Stack {
       targetType: elbv2.TargetType.IP,
       targetGroupName: 'ff-read-tg',
       healthCheck: {
-        path: '/api/v1/health',
-        // Health check moins fréquent pour SSE
+        path: '/api/v1/eval/health',
         interval: cdk.Duration.seconds(60),
         timeout: cdk.Duration.seconds(10),
         healthyThresholdCount: 2,
@@ -137,7 +135,7 @@ export class ComputeStack extends cdk.Stack {
     cfnReadTG.addPropertyOverride('TargetGroupAttributes', [
       { Key: 'deregistration_delay.timeout_seconds', Value: '10' },
       { Key: 'slow_start.duration_seconds', Value: '30' },
-      { Key: 'deregistration_delay.connection_termination.enabled', Value: 'true' },
+      // { Key: 'deregistration_delay.connection_termination.enabled', Value: 'true' },
     ]);
 
     // ========================================
@@ -321,11 +319,6 @@ export class ComputeStack extends cdk.Stack {
     });
 
     // ========================================
-    // Database URL (construit depuis le secret)
-    // ========================================
-    const databaseUrl = `postgresql://\${${props.dbSecret.secretValueFromJson('username').unsafeUnwrap()}}:\${${props.dbSecret.secretValueFromJson('password').unsafeUnwrap()}}@${props.dbEndpoint}:5432/featureflags?schema=public`;
-
-    // ========================================
     // Environment Variables
     // ========================================
     const commonEnv = {
@@ -364,6 +357,7 @@ export class ComputeStack extends cdk.Stack {
     // ========================================
 
     // Management Container
+    // Management Container
     managementTaskDef.addContainer('management-service', {
       containerName: 'management-service',
       image: ecs.ContainerImage.fromEcrRepository(props.managementEcr, 'latest'),
@@ -373,15 +367,19 @@ export class ComputeStack extends cdk.Stack {
       }),
       environment: managementEnv,
       secrets: {
-        DATABASE_URL: ecs.Secret.fromSecretsManager(props.dbSecret, 'connectionString'),
+        DB_HOST: ecs.Secret.fromSecretsManager(props.dbSecret, 'host'),
+        DB_PORT: ecs.Secret.fromSecretsManager(props.dbSecret, 'port'),
+        DB_NAME: ecs.Secret.fromSecretsManager(props.dbSecret, 'dbname'),
+        DB_USERNAME: ecs.Secret.fromSecretsManager(props.dbSecret, 'username'),
+        DB_PASSWORD: ecs.Secret.fromSecretsManager(props.dbSecret, 'password'),
       },
       portMappings: [{ containerPort: 3000, protocol: ecs.Protocol.TCP }],
       healthCheck: {
-        command: ['CMD-SHELL', 'curl -f http://localhost:3000/health || exit 1'],
+        command: ['CMD-SHELL', 'curl -f http://localhost:3000/api/v1/management/health || exit 1'],
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(5),
         retries: 3,
-        startPeriod: cdk.Duration.seconds(60),
+        startPeriod: cdk.Duration.seconds(120), // Plus de temps pour démarrer
       },
     });
 
@@ -396,17 +394,20 @@ export class ComputeStack extends cdk.Stack {
       }),
       environment: readEnv,
       secrets: {
-        DATABASE_URL: ecs.Secret.fromSecretsManager(props.dbSecret, 'connectionString'),
+        DB_HOST: ecs.Secret.fromSecretsManager(props.dbSecret, 'host'),
+        DB_PORT: ecs.Secret.fromSecretsManager(props.dbSecret, 'port'),
+        DB_NAME: ecs.Secret.fromSecretsManager(props.dbSecret, 'dbname'),
+        DB_USERNAME: ecs.Secret.fromSecretsManager(props.dbSecret, 'username'),
+        DB_PASSWORD: ecs.Secret.fromSecretsManager(props.dbSecret, 'password'),
       },
       portMappings: [{ containerPort: 3001, protocol: ecs.Protocol.TCP }],
       healthCheck: {
-        command: ['CMD-SHELL', 'curl -f http://localhost:3001/health || exit 1'],
+        command: ['CMD-SHELL', 'curl -f http://localhost:3001/api/v1/eval/health || exit 1'],
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(5),
         retries: 3,
-        startPeriod: cdk.Duration.seconds(60),
+        startPeriod: cdk.Duration.seconds(120),
       },
-      // Ulimits pour beaucoup de connexions SSE
       ulimits: [
         {
           name: ecs.UlimitName.NOFILE,

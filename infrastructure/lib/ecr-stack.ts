@@ -35,15 +35,16 @@ export class ECRStack extends cdk.Stack {
       // Politique de cycle de vie pour limiter les coûts de stockage
       lifecycleRules: [
         {
-          description: 'Keep last 10 images',
-          maxImageCount: 10,
-          rulePriority: 1,
-        },
-        {
           description: 'Delete untagged images after 1 day',
           maxImageAge: cdk.Duration.days(1),
-          rulePriority: 2,
+          rulePriority: 1, // CORRIGÉ : Priorité 1 (la plus haute) pour les UNTAGGED
           tagStatus: ecr.TagStatus.UNTAGGED,
+        },
+        {
+          description: 'Keep last 10 images (ANY Tag Status)',
+          maxImageCount: 10,
+          rulePriority: 2, // CORRIGÉ : Priorité 2 (la plus basse) pour la règle ANY implicite
+          // tagStatus: ecr.TagStatus.ANY (implicite si non spécifié, mais doit avoir la priorité la plus basse)
         },
       ],
 
@@ -62,15 +63,15 @@ export class ECRStack extends cdk.Stack {
 
       lifecycleRules: [
         {
-          description: 'Keep last 10 images',
-          maxImageCount: 10,
-          rulePriority: 1,
-        },
-        {
           description: 'Delete untagged images after 1 day',
           maxImageAge: cdk.Duration.days(1),
-          rulePriority: 2,
+          rulePriority: 1, // CORRIGÉ : Priorité 1
           tagStatus: ecr.TagStatus.UNTAGGED,
+        },
+        {
+          description: 'Keep last 10 images (ANY Tag Status)',
+          maxImageCount: 10,
+          rulePriority: 2, // CORRIGÉ : Priorité 2
         },
       ],
 

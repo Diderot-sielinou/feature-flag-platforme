@@ -22,6 +22,7 @@ export default [
       '**/out/**',
       '**/.turbo/**',
       'packages/eslint-config/**',
+      'packages/database/**',
     ],
   },
 

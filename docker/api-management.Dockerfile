@@ -8,18 +8,23 @@
 # ================================
 FROM node:20-alpine AS dependencies
 
+RUN apk add --no-cache openssl libc6-compat
+
+
 WORKDIR /app
 
 # Configuration npm pour réseau instable
 RUN npm config set fetch-retries 5 && \
     npm config set fetch-retry-mintimeout 20000 && \
     npm config set fetch-retry-maxtimeout 120000 && \
-    npm config set maxsockets 10
+    npm config set maxsockets 10 && \
+    npm config set fetch-timeout 300000
 
 # Copier les fichiers de lock pour cache Docker optimal
 COPY package.json package-lock.json turbo.json ./
 COPY packages/database/package.json ./packages/database/
 COPY packages/shared/package.json ./packages/shared/
+COPY packages/typescript-config/package.json ./packages/typescript-config/
 COPY apps/api-management/package.json ./apps/api-management/
 COPY apps/api-read/package.json ./apps/api-read/
 
@@ -31,14 +36,17 @@ COPY packages/database/src ./packages/database/src
 # Installer TOUTES les dépendances (dev + prod)
 RUN npm install --include-workspace-root --no-audit
 
-RUN npm install -g typescript@5.3.3
-
 # ================================
 # Stage 2: Builder
 # ================================
 FROM node:20-alpine AS builder
 
+RUN apk add --no-cache openssl libc6-compat
+
 WORKDIR /app
+
+# Installer les outils de build globalement (nécessaire dans ce stage)
+RUN npm install -g typescript@5.3.3 @nestjs/cli
 
 # Copier node_modules du stage précédent (réutilise cache)
 COPY --from=dependencies /app/node_modules ./node_modules
@@ -47,9 +55,17 @@ COPY --from=dependencies /app/package-lock.json ./package-lock.json
 COPY --from=dependencies /app/turbo.json ./turbo.json
 
 # Copier le code source
+COPY packages/typescript-config ./packages/typescript-config
 COPY packages/database ./packages/database
 COPY packages/shared ./packages/shared
 COPY apps/api-management ./apps/api-management
+
+# FIX: Supprimer les node_modules locaux qui auraient pu être copiés
+# Cela force l'utilisation des dépendances installées à la racine
+RUN rm -rf /app/apps/api-management/node_modules \
+    && rm -rf /app/packages/database/node_modules \
+    && rm -rf /app/packages/shared/node_modules \
+    && rm -rf /app/packages/typescript-config/node_modules
 
 # Générer Prisma Client
 WORKDIR /app/packages/database
@@ -68,6 +84,8 @@ RUN echo "✅ Build verification:" && \
 # Stage 3: Production Runtime
 # ================================
 FROM node:20-alpine AS production
+
+RUN apk add --no-cache openssl libc6-compat curl
 
 WORKDIR /app
 
@@ -95,7 +113,6 @@ COPY --from=builder --chown=nestjs:nodejs /app/packages/shared/package.json ./pa
 COPY --from=builder --chown=nestjs:nodejs /app/packages/database/dist ./packages/database/dist
 COPY --from=builder --chown=nestjs:nodejs /app/packages/database/package.json ./packages/database/
 COPY --from=builder --chown=nestjs:nodejs /app/packages/database/prisma ./packages/database/prisma
-COPY --from=builder --chown=nestjs:nodejs /app/packages/database/node_modules ./packages/database/node_modules
 
 # Passer à l'utilisateur non-root
 USER nestjs

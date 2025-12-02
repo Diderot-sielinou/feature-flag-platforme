@@ -1,5 +1,5 @@
-// Exporte les types générés par Prisma (modèles, enums)
+// Re-export Prisma client types and enums
 export * from '@prisma/client';
 
-// Exporte le service Prisma injectable pour les applications NestJS
-export { PrismaService } from './PrismaService.js';
+// Export the NestJS-compatible PrismaService
+export { PrismaService } from './prisma.service.js';

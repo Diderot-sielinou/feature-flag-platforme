@@ -1,15 +1,18 @@
 import { baseConfig } from './packages/eslint-config/base.js';
 
 /**
- * Configuration ESLint racine du monorepo
- * Cette config est utilisée pour les fichiers à la racine uniquement
- * Chaque app/package a sa propre configuration
- */
+
+* ESLint root configuration of the monorepo
+
+* This configuration is used for files in the root directory only
+
+* Each app/package has its own configuration
+
+*/
 export default [
   ...baseConfig,
 
   {
-    // Ignorer l'infrastructure et les fichiers de build
     ignores: [
       'infrastructure/**',
       '**/node_modules/**',
@@ -19,18 +22,15 @@ export default [
       '**/out/**',
       '**/.turbo/**',
       'packages/eslint-config/**',
+      'packages/database/**',
     ],
   },
 
   {
-    // Configuration pour les fichiers de configuration
     files: ['*.js', '*.mjs', '*.cjs'],
-    // 🛑 BLOQUER LE PARSEUR ET LE TYPAGE TYPESCRIPT HÉRITÉ
     languageOptions: {
-      // Retire explicitement le parseur TS pour revenir au parseur JS par défaut
       parser: undefined,
       parserOptions: {
-        // Désactive la recherche de tsconfig qui cause l'erreur "Parsing error: That TSConfig does not include this file"
         project: null,
         tsconfigRootDir: undefined,
         sourceType: 'module',

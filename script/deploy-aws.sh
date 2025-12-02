@@ -104,6 +104,9 @@ deploy_base_infrastructure() {
     
     log_info "Déploiement de AuthStack..."
     npx cdk deploy FeatureFlagsAuthStack --require-approval never
+
+    log_info "Déploiement de emailStack..."
+    npx cdk deploy FeatureFlagsEmailStack --require-approval never
     
     log_info "Déploiement de MessagingStack..."
     npx cdk deploy FeatureFlagsMessagingStack --require-approval never
@@ -409,7 +412,7 @@ wait_for_services() {
     aws ecs wait services-stable \
         --region ${AWS_REGION} \
         --cluster ${CLUSTER_NAME} \
-        --services ManagementService ReadService || {
+        --services feature-flags-management feature-flags-read || {
             log_warning "Timeout lors de l'attente. Les services peuvent encore se stabiliser..."
             log_info "Vérifiez manuellement: aws ecs describe-services --cluster ${CLUSTER_NAME} --services ManagementService ReadService"
         }
@@ -429,7 +432,7 @@ verify_deployment() {
     
     # Test Management API (health check à la racine)
     log_info "Test du health check Management API..."
-    MGMT_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" "http://${ALB_DNS}/health" || echo "CURL_FAILED")
+    MGMT_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" "http://${ALB_DNS}/api/v1/management/health" || echo "CURL_FAILED")
     
     if echo "$MGMT_RESPONSE" | grep -q "HTTP_CODE:200"; then
         log_success "Management API : ✅ HEALTHY"
@@ -442,7 +445,7 @@ verify_deployment() {
     
     # Test Read API
     log_info "Test du health check Read API..."
-    READ_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" "http://${ALB_DNS}/health" || echo "CURL_FAILED")
+    READ_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" "http://${ALB_DNS}/api/v1/eval/health" || echo "CURL_FAILED")
     
     if echo "$READ_RESPONSE" | grep -q "HTTP_CODE:200"; then
         log_success "Read API : ✅ HEALTHY"

@@ -17,7 +17,13 @@
     "REDIS_URL",
     "COGNITO_POOL_ID",
     "COGNITO_CLIENT_ID",
-    "PORT"
+    "PORT",
+    "DB_HOST",
+    "DB_USERNAME",
+    "DB_PASSWORD",
+    "DB_HOST",
+    "DB_PORT",
+    "DB_NAME"
   ],
 
   "tasks": {

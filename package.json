@@ -12,8 +12,7 @@
   },
   "workspaces": [
     "apps/*",
-    "packages/*",
-    "infrastructure"
+    "packages/*"
   ],
   "scripts": {
     "// ---- DEV ----": "",

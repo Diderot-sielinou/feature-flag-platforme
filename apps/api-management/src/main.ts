@@ -1,3 +1,12 @@
+if (!process.env.DATABASE_URL && process.env.DB_HOST) {
+  const user = encodeURIComponent(process.env.DB_USERNAME || 'postgres');
+  const pass = encodeURIComponent(process.env.DB_PASSWORD || '');
+  const host = process.env.DB_HOST;
+  const port = process.env.DB_PORT || '5432';
+  const db = process.env.DB_NAME || 'featureflags';
+  process.env.DATABASE_URL = `postgresql://${user}:${pass}@${host}:${port}/${db}?schema=public`;
+}
+
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
@@ -29,7 +38,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
 
-  await app.listen(port, '0.0.0.0'); // ⚠️ IMPORTANT: 0.0.0.0 pour Docker
+  await app.listen(port, '0.0.0.0'); // ⚠️ IMPORTANT: 0.0.0.0 for Docker
 
   logger.log(`🚀 Management API running on port ${port}`);
   logger.log(

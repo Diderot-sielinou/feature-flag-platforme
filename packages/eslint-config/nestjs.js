@@ -1,11 +1,14 @@
 import { baseConfig } from './base.js';
 
 /**
- * Configuration ESLint pour les applications NestJS
- * Hérite de baseConfig + règles spécifiques backend
- *
- * @type {import("eslint").Linter.Config[]}
- */
+
+* ESLint configuration for NestJS applications
+
+* Inherits baseConfig + backend-specific rules
+
+* @type {import("eslint").Linter.Config[]}
+
+*/
 export const nestjsConfig = [
   ...baseConfig,
 
@@ -14,11 +17,11 @@ export const nestjsConfig = [
 
     rules: {
       // === NestJS Specific ===
-      // Les constructeurs vides sont OK pour l'injection de dépendances
+      // Empty constructors are OK for dependency injection.
       '@typescript-eslint/no-useless-constructor': 'off',
       'no-useless-constructor': 'off',
 
-      // Les fonctions vides sont OK pour les méthodes abstraites
+      // Empty functions are OK for abstract methods
       '@typescript-eslint/no-empty-function': 'off',
       'no-empty-function': 'off',
 
@@ -47,7 +50,6 @@ export const nestjsConfig = [
       'no-console': 'off',
 
       // === Decorators ===
-      // NestJS utilise beaucoup les décorateurs
       '@typescript-eslint/no-unsafe-declaration-merging': 'off',
     },
   },
@@ -55,7 +57,6 @@ export const nestjsConfig = [
   {
     files: ['**/*.spec.ts', '**/*.test.ts', '**/test/**/*.ts', '**/__tests__/**/*.ts'],
     rules: {
-      // Règles plus souples pour les tests
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',

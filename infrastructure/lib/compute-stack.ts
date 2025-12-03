@@ -281,6 +281,31 @@ export class ComputeStack extends cdk.Stack {
     );
     // ----------------------------------------------------------------------------------
 
+    // --- 2. Rôle de Tâche (Task Role) pour la Migration (PoLP) ---
+    // Ce rôle n'a AUCUNE permission AWS (il ne fait qu'exécuter Prisma et se connecter à la DB).
+    // Les secrets sont gérés par le Rôle d'Exécution.
+    const migrationTaskRole = new iam.Role(this, 'MigrationTaskRole', {
+      roleName: 'feature-flags-migration-task-role',
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+      description: 'Minimal IAM Role for Database Migration Task.',
+    });
+    // ATTENTION: Si votre script de migration devait utiliser AWS CLI (S3, etc.), les permissions seraient ajoutées ici.
+    // Dans le cas de Prisma, aucune permission n'est requise.
+
+    // --- 3. Rôle d'Exécution (Task Execution Role) partagé ---
+    // Nous avons besoin d'un Task Execution Role qui peut lire les secrets et tirer les images.
+    // L'agent ECS va utiliser ce rôle pour le démarrage de TOUTES les tâches.
+    const taskExecutionRole = new iam.Role(this, 'TaskExecutionRole', {
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+      description: 'ECS Task Execution Role for ECR and Secrets access.',
+    });
+    // Attache la politique par défaut d'ECS (lecture d'ECR, logs CloudWatch)
+    taskExecutionRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonECSTaskExecutionRolePolicy'),
+    );
+    // Ajoute la permission de lire le secret RDS (crucial pour l'injection)
+    props.dbSecret.grantRead(taskExecutionRole);
+
     // ========================================
     // Log Groups
     // ========================================
@@ -317,6 +342,47 @@ export class ComputeStack extends cdk.Stack {
       memoryLimitMiB: isProduction ? 1024 : 512,
       taskRole,
     });
+
+    // ----------------------------------------------------------------------------------
+    // NOUVEAU : Task Definition de Migration
+    // ----------------------------------------------------------------------------------
+    const migrationLogGroup = new logs.LogGroup(this, 'MigrationLogs', {
+      logGroupName: '/ecs/feature-flags/migration',
+      retention: logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const migrationTaskDef = new ecs.FargateTaskDefinition(this, 'MigrationTaskDef', {
+      family: 'feature-flags-migration',
+      cpu: 256, // Peut être minimal
+      memoryLimitMiB: 512,
+      taskRole: migrationTaskRole, // ✅ Rôle minimaliste (PoLP)
+      executionRole: taskExecutionRole, // Rôle qui peut lire les secrets et l'image
+    });
+
+    migrationTaskDef.addContainer('migration-container', {
+      containerName: 'migration', // Nom utilisé dans l'override de la commande run-task
+      image: ecs.ContainerImage.fromEcrRepository(props.managementEcr, 'latest'),
+      logging: ecs.LogDrivers.awsLogs({
+        streamPrefix: 'migration',
+        logGroup: migrationLogGroup,
+      }),
+      // L'environnement minimal requis pour le conteneur
+      environment: {
+        NODE_ENV: 'production', // Pour forcer la config de prod
+        // Autres variables si nécessaires (ex: REDIS_HOST)
+      },
+      // Secrets nécessaires pour la construction de la DATABASE_URL par Prisma/NestJS
+      secrets: {
+        DB_HOST: ecs.Secret.fromSecretsManager(props.dbSecret, 'host'),
+        DB_PORT: ecs.Secret.fromSecretsManager(props.dbSecret, 'port'),
+        DB_NAME: ecs.Secret.fromSecretsManager(props.dbSecret, 'dbname'),
+        DB_USERNAME: ecs.Secret.fromSecretsManager(props.dbSecret, 'username'),
+        DB_PASSWORD: ecs.Secret.fromSecretsManager(props.dbSecret, 'password'),
+      },
+      // Pas de port mapping ni de health check requis pour une tâche ponctuelle
+    });
+    // ----------------------------------------------------------------------------------
 
     // ========================================
     // Environment Variables
@@ -356,7 +422,6 @@ export class ComputeStack extends cdk.Stack {
     // Container Definitions
     // ========================================
 
-    // Management Container
     // Management Container
     managementTaskDef.addContainer('management-service', {
       containerName: 'management-service',
@@ -534,6 +599,15 @@ export class ComputeStack extends cdk.Stack {
       value: this.readService.serviceName,
       description: 'Read ECS Service Name',
       exportName: 'FeatureFlagsReadServiceName',
+    });
+
+    // ----------------------------------------------------------------------------------
+    // NOUVEAU OUTPUT : Nom de la Task Definition de Migration pour le CI/CD
+    // ----------------------------------------------------------------------------------
+    new cdk.CfnOutput(this, 'MigrationTaskDefFamily', {
+      value: migrationTaskDef.family,
+      description: 'ECS Task Definition Family name for database migrations.',
+      exportName: 'FeatureFlagsMigrationTaskDefFamily',
     });
   }
 }

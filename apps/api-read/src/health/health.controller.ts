@@ -14,7 +14,7 @@ export class HealthController {
   @Get('/force')
   force(): { status: string; timestamp: string; service: string } {
     return {
-      status: 'change done üüüüüüü',
+      status: 'change done bollos',
       timestamp: new Date().toISOString(),
       service: 'api-read force',
     };

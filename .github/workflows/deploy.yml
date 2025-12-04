@@ -135,25 +135,34 @@ jobs:
       # -----------------------------------------------------------------------
       # 2. Run Database Migrations (Secure/Idempotent via Fargate)
       # -----------------------------------------------------------------------
+      # -----------------------------------------------------------------------
+      # 2. Run Database Migrations (Secure/Idempotent via Fargate)
+      # -----------------------------------------------------------------------
       - name: Run migration task
         env:
           MIGRATION_TASK_DEF_FAMILY: ${{ steps.cdk_deploy.outputs.migration_task_family }}
+          # Exposer les secrets au script Bash pour les nettoyer
+          PRIVATE_SUBNET_IDS: ${{ secrets.PRIVATE_SUBNET_IDS }}
+          APP_SECURITY_GROUP_ID: ${{ secrets.APP_SECURITY_GROUP_ID }}
         run: |
           echo "Migration Task Definition Family: $MIGRATION_TASK_DEF_FAMILY"
 
-          # Vérification de l'existence de la Task Definition Family
-          if [ -z "$MIGRATION_TASK_DEF_FAMILY" ] || [ "$MIGRATION_TASK_DEF_FAMILY" == "null" ]; then
-            echo "❌ Erreur: La Task Definition Family (FeatureFlagsMigrationTaskDefFamily) n'a pas été trouvée dans les outputs CDK."
-            # Utilisation de la valeur par défaut connue si l'output n'est pas trouvé
-            MIGRATION_TASK_DEF_FAMILY="feature-flags-migration"
-            echo "Tentative d'utilisation de la valeur par défaut: $MIGRATION_TASK_DEF_FAMILY"
-          fi
+          # ... (omitted verification logic)
+
+          # 🚨 CORRECTION : Nettoyage des variables réseau
+          # 1. Utiliser les variables d'environnement locales
+          # 2. Supprimer les guillemets doubles/simples et les espaces
+          CLEAN_SUBNETS=$(echo "$PRIVATE_SUBNET_IDS" | tr -d '[:space:]' | tr -d '\"')
+          CLEAN_SG_ID=$(echo "$APP_SECURITY_GROUP_ID" | tr -d '[:space:]' | tr -d '\"')
+
+          echo "Using Cleaned Subnets: $CLEAN_SUBNETS"
+          echo "Using Cleaned SG ID: $CLEAN_SG_ID"
 
           TASK_ARN=$(aws ecs run-task \
             --cluster feature-flags-cluster \
             --task-definition $MIGRATION_TASK_DEF_FAMILY \
             --launch-type FARGATE \
-            --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.PRIVATE_SUBNET_IDS }}],securityGroups=[${{ secrets.APP_SECURITY_GROUP_ID }}],assignPublicIp=DISABLED}" \
+            --network-configuration "awsvpcConfiguration={subnets=[$CLEAN_SUBNETS],securityGroups=[$CLEAN_SG_ID],assignPublicIp=DISABLED}" \
             --overrides '{
               "containerOverrides": [{
                 "name": "migration",
@@ -161,10 +170,11 @@ jobs:
               }]
             }' \
             --query 'tasks[0].taskArn' \
-            --output text) # <-- Supprimer le > task_arn.txt et la ligne suivante
-
+            --output text)
+            
           echo "Waiting for migration task: $TASK_ARN"  
 
+          # ... (rest of the script is correct)
           aws ecs wait tasks-stopped \
             --cluster feature-flags-cluster \
             --tasks $TASK_ARN

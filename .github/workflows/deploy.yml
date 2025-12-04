@@ -57,7 +57,8 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./docker/api-management/Dockerfile
+          # ⚠️ CORRECTION: Utilisation du chemin correct pour un monorepo
+          file: docker/api-management/Dockerfile
           push: true
           tags: |
             ${{ env.ECR_REGISTRY }}/feature-flags/api-management:${{ github.sha }}
@@ -74,7 +75,8 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./docker/api-read/Dockerfile
+          # ⚠️ CORRECTION: Utilisation du chemin correct pour un monorepo
+          file: docker/api-read/Dockerfile
           push: true
           tags: |
             ${{ env.ECR_REGISTRY }}/feature-flags/api-read:${{ github.sha }}
@@ -140,14 +142,22 @@ jobs:
         run: |
           echo "Migration Task Definition Family: $MIGRATION_TASK_DEF_FAMILY"
 
+          # Vérification de l'existence de la Task Definition Family
+          if [ -z "$MIGRATION_TASK_DEF_FAMILY" ] || [ "$MIGRATION_TASK_DEF_FAMILY" == "null" ]; then
+            echo "❌ Erreur: La Task Definition Family (FeatureFlagsMigrationTaskDefFamily) n'a pas été trouvée dans les outputs CDK."
+            # Utilisation de la valeur par défaut connue si l'output n'est pas trouvé
+            MIGRATION_TASK_DEF_FAMILY="feature-flags-migration"
+            echo "Tentative d'utilisation de la valeur par défaut: $MIGRATION_TASK_DEF_FAMILY"
+          fi
+
           TASK_ARN=$(aws ecs run-task \
             --cluster feature-flags-cluster \
-            --task-definition $MIGRATION_TASK_DEF_FAMILY \  # ✅ UTILISATION DU NOM EXPORTÉ
+            --task-definition $MIGRATION_TASK_DEF_FAMILY \
             --launch-type FARGATE \
             --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.PRIVATE_SUBNET_IDS }}],securityGroups=[${{ secrets.APP_SECURITY_GROUP_ID }}],assignPublicIp=DISABLED}" \
             --overrides '{
               "containerOverrides": [{
-                "name": "migration", # ✅ LE NOM DU CONTENEUR EST 'migration' dans votre CDK
+                "name": "migration", # Doit correspondre au nom du conteneur dans votre Task Def
                 "command": ["npm", "run", "db:migrate:prod"]
               }]
             }' \
@@ -170,7 +180,7 @@ jobs:
           if [ "$EXIT_CODE" != "0" ]; then
             echo "Migration failed with exit code: $EXIT_CODE"
             # Afficher les logs de la tâche en cas d'échec pour un meilleur debug
-            aws logs tail /ecs/feature-flags/migration --since 1h --filter $TASK_ARN
+            aws logs tail /ecs/feature-flags/migration --since 1h --filter $TASK_ARN --region ${{ env.AWS_REGION }}
             exit 1
           fi
 
@@ -182,7 +192,7 @@ jobs:
   deploy-services:
     name: Update ECS Services & Check
     runs-on: ubuntu-latest
-    needs: [build-and-push, cdk-deploy] # Dépendances sur les images et le CDK
+    needs: [build-and-push, cdk-deploy] # Dépendances sur les images et le CDK/Migration
     permissions:
       id-token: write
       contents: read
@@ -198,7 +208,7 @@ jobs:
 
       # Les task definitions ont été mises à jour par le job 'cdk-deploy'.
       # On force un redéploiement pour utiliser la nouvelle task definition.
-      - name: Update ECS Service - Management API
+      - name: Update ECS Services - Force New Deployment
         run: |
           aws ecs update-service \
             --cluster feature-flags-cluster \
@@ -206,8 +216,6 @@ jobs:
             --force-new-deployment \
             --desired-count 2
 
-      - name: Update ECS Service - Read API
-        run: |
           aws ecs update-service \
             --cluster feature-flags-cluster \
             --service feature-flags-read \
@@ -229,29 +237,31 @@ jobs:
       - name: Get ALB URL
         id: get-url
         run: |
-          # Utilisation de la stack nommée dans les logs de déploiement
+          # Récupère l'URL de l'ALB depuis les outputs de la stack CDK
           ALB_DNS=$(aws cloudformation describe-stacks \
             --stack-name FeatureFlagsComputeStack \
             --query 'Stacks[0].Outputs[?OutputKey==`ALBDNSName`].OutputValue' \
             --output text)
-          # Utiliser HTTPS est une meilleure pratique par défaut si un CloudFront ou un Listener 443 est en place
+
+          # Expose l'URL pour le Health Check et la notification
           echo "url=http://$ALB_DNS" >> $GITHUB_OUTPUT
 
       # -----------------------------------------------------------------------
-      # Health Check (Crucial for p99 < 50ms architecture validation)
+      # Health Check (Validation finale)
       # -----------------------------------------------------------------------
       - name: Health check
         run: |
           URL="${{ steps.get-url.outputs.url }}/api/v1/management/health"
-          MAX_RETRIES=15 # Augmenter les tentatives (15 * 20s = 5 min max)
+          MAX_RETRIES=15 
           RETRY_COUNT=0
 
+          echo "Démarrage du Health Check sur $URL"
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            # -m 10 : timeout après 10s (important pour la performance)
+            # Utilisation de cURL avec un timeout et récupération du code HTTP
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 10 "$URL" || echo "000")
 
             if [ "$HTTP_CODE" = "200" ]; then
-              echo "Health check passed for $URL!"
+              echo "✅ Health check passed (HTTP 200) for $URL!"
               exit 0
             fi
 

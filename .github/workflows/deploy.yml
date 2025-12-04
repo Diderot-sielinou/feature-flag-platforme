@@ -60,7 +60,7 @@ jobs:
         with:
           context: .
           # ⚠️ CORRECTION: Utilisation du chemin correct pour un monorepo
-          file: docker/api-management/Dockerfile
+          file: ./docker/api-management.Dockerfile
           push: true
           tags: |
             ${{ env.ECR_REGISTRY }}/feature-flags/api-management:${{ github.sha }}
@@ -78,7 +78,7 @@ jobs:
         with:
           context: .
           # ⚠️ CORRECTION: Utilisation du chemin correct pour un monorepo
-          file: docker/api-read/Dockerfile
+          file: ./docker/api-read.Dockerfile
           push: true
           tags: |
             ${{ env.ECR_REGISTRY }}/feature-flags/api-read:${{ github.sha }}

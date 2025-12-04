@@ -129,7 +129,7 @@ jobs:
             --outputs-file cdk-outputs.json
 
           # Récupère le nom de la Task Definition Family depuis l'output CDK
-          TASK_DEF_FAMILY=$(jq -r '.FeatureFlagsComputeStack.FeatureFlagsMigrationTaskDefFamily' cdk-outputs.json)
+          TASK_DEF_FAMILY=$(jq -r '.FeatureFlagsComputeStack.MigrationTaskDefFamily' cdk-outputs.json)
           echo "migration_task_family=$TASK_DEF_FAMILY" >> $GITHUB_OUTPUT
 
       # -----------------------------------------------------------------------
@@ -149,7 +149,7 @@ jobs:
             echo "Tentative d'utilisation de la valeur par défaut: $MIGRATION_TASK_DEF_FAMILY"
           fi
 
-            TASK_ARN=$(aws ecs run-task \
+          TASK_ARN=$(aws ecs run-task \
             --cluster feature-flags-cluster \
             --task-definition $MIGRATION_TASK_DEF_FAMILY \
             --launch-type FARGATE \

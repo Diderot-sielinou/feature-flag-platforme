@@ -1,0 +1,5 @@
+// apps/api-management/tsconfig.eslint.json (Vérification)
+{
+  "extends": "./tsconfig.json", // Hérite d'un fichier qui inclut désormais les tests
+  "include": ["src/**/*", "test/**/*", "**/*.ts"]
+}

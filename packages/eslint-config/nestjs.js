@@ -1,51 +1,67 @@
-import { config as baseConfig } from "./base.js";
-import tseslint from "typescript-eslint";
-import securityPlugin from "eslint-plugin-security";
-import nodePlugin from "eslint-plugin-node";
+import { baseConfig } from './base.js';
 
 /**
- * Configuration ESLint pour les microservices NestJS (backend).
- *
- * @type {import("eslint").Linter.Config[]}
- * */
-export const nestjsConfig = [
-  // 1. Hérite de toutes les règles de la configuration de base
-  ...baseConfig,
-  
-  // 2. Configuration spécifique à l'analyse de fichiers TypeScript
-  {
-    files: ["**/*.ts", "**/*.tsx"], // Appliquer uniquement aux fichiers TS/TSX
-    languageOptions: {
-      parserOptions: {
-        // Nécessaire pour les règles qui dépendent de l'information de type (ex: no-unused-vars)
-        project: "tsconfig.json", 
-      },
-    },
-    // Ajout des plugins pour la sécurité et Node.js
-    plugins: {
-      security: securityPlugin,
-      node: nodePlugin,
-    },
-    rules: {
-      // --- Règles spécifiques à NestJS (Injection de Dépendances / Classes) ---
-      "no-useless-constructor": "off",
-      "@typescript-eslint/no-useless-constructor": "off", 
-      "no-empty-function": "off",
-      "@typescript-eslint/no-empty-function": "off",
-      
-      // Bonne pratique NestJS : permet l'utilisation de _ pour les variables non utilisées (DI)
-      "no-unused-vars": "off",
-      "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
 
-      // --- Règles spécifiques à Node.js / Monorepo ---
-      // Désactivée car gérée par les outils de build du monorepo
-      "node/no-missing-import": "off", 
-      
-      // --- Règles de Sécurité ---
-      // Interdit l'utilisation de 'eval' avec expression pour prévenir le RCE
-      "security/detect-eval-with-expression": "error",
-      // Interdit les expressions régulières non sécurisées (prévention ReDoS)
-      "security/detect-unsafe-regex": "error",
+* ESLint configuration for NestJS applications
+
+* Inherits baseConfig + backend-specific rules
+
+* @type {import("eslint").Linter.Config[]}
+
+*/
+export const nestjsConfig = [
+  ...baseConfig,
+
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+
+    rules: {
+      // === NestJS Specific ===
+      // Empty constructors are OK for dependency injection.
+      '@typescript-eslint/no-useless-constructor': 'off',
+      'no-useless-constructor': 'off',
+
+      // Empty functions are OK for abstract methods
+      '@typescript-eslint/no-empty-function': 'off',
+      'no-empty-function': 'off',
+
+      // === TypeScript Strict ===
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/await-thenable': 'error',
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        {
+          checksVoidReturn: false,
+        },
+      ],
+      '@typescript-eslint/require-await': 'warn',
+
+      // === Security ===
+      'no-eval': 'error',
+      'no-implied-eval': 'error',
+      'no-new-func': 'error',
+
+      // === Best Practices ===
+      'no-return-await': 'off',
+      '@typescript-eslint/return-await': ['error', 'always'],
+
+      // === Console ===
+      // Autoriser console.log/warn/error en backend
+      'no-console': 'off',
+
+      // === Decorators ===
+      '@typescript-eslint/no-unsafe-declaration-merging': 'off',
+    },
+  },
+
+  {
+    files: ['**/*.spec.ts', '**/*.test.ts', '**/test/**/*.ts', '**/__tests__/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      'no-console': 'off',
     },
   },
 ];

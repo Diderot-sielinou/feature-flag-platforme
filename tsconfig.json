@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Root TypeScript Config",
+  "files": [],
+  "references": [
+    {
+      "path": "./apps/api-management"
+    },
+    {
+      "path": "./apps/api-read"
+    },
+    {
+      "path": "./apps/dashboard"
+    },
+    {
+      "path": "./packages/shared"
+    },
+    {
+      "path": "./packages/database"
+    },
+    {
+      "path": "./packages/sdk"
+    },
+    {
+      "path": "./packages/ui"
+    }
+  ]
+}

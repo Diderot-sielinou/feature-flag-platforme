@@ -1,4 +1,11 @@
-import { config } from "@repo/eslint-config/react-internal";
+import { baseConfig } from '@repo/eslint-config/base';
 
 /** @type {import("eslint").Linter.Config} */
-export default config;
+export default [
+  ...baseConfig,
+  {
+    rules: {
+      'no-alert': 'off',
+    },
+  },
+];

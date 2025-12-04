@@ -1,5 +1,6 @@
 {
   "name": "feature-flags-platform",
+  "type": "module",
   "private": true,
   "version": "1.0.0",
   "description": "Feature flags platform - monorepo with Turborepo, NestJS, Next.js, and AWS CDK infrastructure.",
@@ -11,20 +12,25 @@
   },
   "workspaces": [
     "apps/*",
-    "packages/*",
-    "infrastructure"
+    "packages/*"
   ],
   "scripts": {
     "// ---- DEV ----": "",
     "dev": "turbo run dev --parallel",
-    "dev:api": "turbo run dev --filter=api-*^",
+    "dev:api": "turbo run dev --filter=\"api-*\" --parallel",
     "dev:dashboard": "turbo run dev --filter=dashboard",
+    "dev:api-manage": "turbo run dev --filter=api-management",
     "// ---- BUILD & TEST ----": "",
     "build": "turbo run build",
-    "test": "turbo run test --parallel",
+    "test": "turbo run test --parallel --",
     "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
+    "type-check": "turbo run type-check",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "prepare": "husky install",
+    "db:generate": "cd packages/database && prisma generate",
+    "db:migrate:dev": "cd packages/database && prisma migrate dev",
+    "db:migrate:prod": "cd packages/database && prisma migrate deploy",
     "// ---- DOCKER LOCAL ----": "",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f docker/docker-compose.yml down",
@@ -42,22 +48,40 @@
     "clean": "rm -rf node_modules && rm -rf apps/*/node_modules && rm -rf packages/*/node_modules && rm -rf .turbo"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
     "@turbo/gen": "^1.11.0",
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^8.47.0",
+    "@typescript-eslint/parser": "^8.47.0",
+    "@typescript-eslint/utils": "^8.47.0",
     "aws-cdk-lib": "^2.154.0",
     "constructs": "^10.3.0",
     "dotenv-cli": "^7.3.0",
-    "eslint": "^8.56.0",
-    "eslint-config-prettier": "^9.1.0",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-security": "^3.0.1",
     "eslint-plugin-turbo": "^2.6.0",
     "husky": "^9.0.0",
     "lint-staged": "^15.0.0",
     "prettier": "^3.1.0",
     "turbo": "^2.6.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "typescript-eslint": "8.47.0",
+    "undici-types": "^7.16.0"
   },
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
+  },
+  "overrides": {
+    "glob": "8.1.0",
+    "minimatch": "5.1.6",
+    "@types/glob": "8.1.0"
   },
   "packageManager": "npm@11.6.2",
   "lint-staged": {

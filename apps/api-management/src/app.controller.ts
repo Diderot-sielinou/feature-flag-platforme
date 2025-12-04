@@ -13,6 +13,6 @@ export class AppController {
 
   @Get('/name')
   getName(): string {
-    return 'salut yvan xdkw? ';
+    return 'salut yvan xdkw? bro ';
   }
 }

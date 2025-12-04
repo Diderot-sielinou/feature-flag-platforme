@@ -1,0 +1,293 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }} # Utilisation de vars pour la région
+  NODE_VERSION: '20'
+  # Utilisation d'un secret pour l'ID de compte pour une meilleure sécurité
+  ECR_REGISTRY:
+    ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION || 'us-east-1' }}.amazonaws.com
+
+jobs:
+  # ===========================================================================
+  # BUILD AND PUSH DOCKER IMAGES
+  # ===========================================================================
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Permet d'assumer un rôle IAM
+      contents: read
+    outputs:
+      image-tag: ${{ github.sha }} # Output de l'image taggée
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Utilise OIDC pour assumer le rôle ARN de déploiement
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # -----------------------------------------------------------------------
+      # Build & Push API Management
+      # -----------------------------------------------------------------------
+      - name: Build and push API Management
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/api-management/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/feature-flags/api-management:${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/feature-flags/api-management:latest
+          # Utilisation de l'image ECR existante comme cache primaire
+          cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/feature-flags/api-management:latest
+          cache-to:
+            type=registry,ref=${{ env.ECR_REGISTRY }}/feature-flags/api-management:cache,mode=max
+
+      # -----------------------------------------------------------------------
+      # Build & Push API Read
+      # -----------------------------------------------------------------------
+      - name: Build and push API Read
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/api-read/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/feature-flags/api-read:${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/feature-flags/api-read:latest
+          # Utilisation de l'image ECR existante comme cache primaire
+          cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/feature-flags/api-read:latest
+          cache-to: type=registry,ref=${{ env.ECR_REGISTRY }}/feature-flags/api-read:cache,mode=max
+
+  # ===========================================================================
+  # DEPLOY INFRASTRUCTURE & MIGRATIONS
+  # ===========================================================================
+  cdk-deploy:
+    name: CDK & Migration
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Monorepo Dependencies
+        run: npm ci
+
+      - name: Install CDK Dependencies
+        run: npm ci --prefix infrastructure
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # -----------------------------------------------------------------------
+      # 1. Deploy CDK Stack (Update Task Definitions & Infra)
+      # -----------------------------------------------------------------------
+      - name: Deploy FeatureFlagsComputeStack and Get Outputs
+        id: cdk_deploy
+        run: |
+          cd infrastructure
+          # Déploie la Task Definition de migration que vous venez de créer
+          npx cdk deploy FeatureFlagsComputeStack \
+            --require-approval never \
+            --outputs-file cdk-outputs.json
+
+          # Récupère le nom de la Task Definition Family depuis l'output CDK
+          TASK_DEF_FAMILY=$(jq -r '.FeatureFlagsComputeStack.FeatureFlagsMigrationTaskDefFamily' cdk-outputs.json)
+          echo "migration_task_family=$TASK_DEF_FAMILY" >> $GITHUB_OUTPUT
+
+      # -----------------------------------------------------------------------
+      # 2. Run Database Migrations (Secure/Idempotent via Fargate)
+      # -----------------------------------------------------------------------
+      - name: Run migration task
+        env:
+          MIGRATION_TASK_DEF_FAMILY: ${{ steps.cdk_deploy.outputs.migration_task_family }}
+        run: |
+          echo "Migration Task Definition Family: $MIGRATION_TASK_DEF_FAMILY"
+
+          TASK_ARN=$(aws ecs run-task \
+            --cluster feature-flags-cluster \
+            --task-definition $MIGRATION_TASK_DEF_FAMILY \  # ✅ UTILISATION DU NOM EXPORTÉ
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.PRIVATE_SUBNET_IDS }}],securityGroups=[${{ secrets.APP_SECURITY_GROUP_ID }}],assignPublicIp=DISABLED}" \
+            --overrides '{
+              "containerOverrides": [{
+                "name": "migration", # ✅ LE NOM DU CONTENEUR EST 'migration' dans votre CDK
+                "command": ["npm", "run", "db:migrate:prod"]
+              }]
+            }' \
+            --query 'tasks[0].taskArn' \
+            --output text > task_arn.txt
+            
+          TASK_ARN=$(cat task_arn.txt)
+          echo "Waiting for migration task: $TASK_ARN"
+
+          aws ecs wait tasks-stopped \
+            --cluster feature-flags-cluster \
+            --tasks $TASK_ARN
+
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster feature-flags-cluster \
+            --tasks $TASK_ARN \
+            --query 'tasks[0].containers[0].exitCode' \
+            --output text)
+
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "Migration failed with exit code: $EXIT_CODE"
+            # Afficher les logs de la tâche en cas d'échec pour un meilleur debug
+            aws logs tail /ecs/feature-flags/migration --since 1h --filter $TASK_ARN
+            exit 1
+          fi
+
+          echo "Migration completed successfully"
+
+  # ===========================================================================
+  # UPDATE ECS SERVICES AND HEALTH CHECK
+  # ===========================================================================
+  deploy-services:
+    name: Update ECS Services & Check
+    runs-on: ubuntu-latest
+    needs: [build-and-push, cdk-deploy] # Dépendances sur les images et le CDK
+    permissions:
+      id-token: write
+      contents: read
+    environment:
+      name: ${{ github.event.inputs.environment || 'staging' }}
+      url: ${{ steps.get-url.outputs.url }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Les task definitions ont été mises à jour par le job 'cdk-deploy'.
+      # On force un redéploiement pour utiliser la nouvelle task definition.
+      - name: Update ECS Service - Management API
+        run: |
+          aws ecs update-service \
+            --cluster feature-flags-cluster \
+            --service feature-flags-management \
+            --force-new-deployment \
+            --desired-count 2
+
+      - name: Update ECS Service - Read API
+        run: |
+          aws ecs update-service \
+            --cluster feature-flags-cluster \
+            --service feature-flags-read \
+            --force-new-deployment \
+            --desired-count 3
+
+      - name: Wait for services to stabilize
+        run: |
+          echo "Waiting for Management API..."
+          aws ecs wait services-stable \
+            --cluster feature-flags-cluster \
+            --services feature-flags-management
+
+          echo "Waiting for Read API..."
+          aws ecs wait services-stable \
+            --cluster feature-flags-cluster \
+            --services feature-flags-read
+
+      - name: Get ALB URL
+        id: get-url
+        run: |
+          # Utilisation de la stack nommée dans les logs de déploiement
+          ALB_DNS=$(aws cloudformation describe-stacks \
+            --stack-name FeatureFlagsComputeStack \
+            --query 'Stacks[0].Outputs[?OutputKey==`ALBDNSName`].OutputValue' \
+            --output text)
+          # Utiliser HTTPS est une meilleure pratique par défaut si un CloudFront ou un Listener 443 est en place
+          echo "url=http://$ALB_DNS" >> $GITHUB_OUTPUT
+
+      # -----------------------------------------------------------------------
+      # Health Check (Crucial for p99 < 50ms architecture validation)
+      # -----------------------------------------------------------------------
+      - name: Health check
+        run: |
+          URL="${{ steps.get-url.outputs.url }}/api/v1/management/health"
+          MAX_RETRIES=15 # Augmenter les tentatives (15 * 20s = 5 min max)
+          RETRY_COUNT=0
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            # -m 10 : timeout après 10s (important pour la performance)
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 10 "$URL" || echo "000")
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "Health check passed for $URL!"
+              exit 0
+            fi
+
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "Health check failed (HTTP $HTTP_CODE) for $URL, retrying in 20s... ($RETRY_COUNT/$MAX_RETRIES)"
+            sleep 20
+          done
+
+          echo "❌ Health check failed after $MAX_RETRIES retries for $URL"
+          exit 1
+
+  # ===========================================================================
+  # NOTIFY
+  # ===========================================================================
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [deploy-services]
+    if: always()
+    steps:
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "${{ needs.deploy-services.result == 'success' && '✅' || '❌' }} LaunchLayer deployment to ${{ github.event.inputs.environment || 'staging' }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ needs.deploy-services.result == 'success' && '✅ Deployment successful!' || '❌ Deployment failed!' }}\n*Environment:* ${{ github.event.inputs.environment || 'staging' }}\n*Service:* LaunchLayer ECS\n*Commit:* `${{ github.sha }}`\n*Branch:* ${{ github.ref_name }}\n*Actor:* ${{ github.actor }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

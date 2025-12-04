@@ -17,9 +17,8 @@ on:
           - production
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }} # Utilisation de vars pour la région
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
   NODE_VERSION: '20'
-  # Utilisation d'un secret pour l'ID de compte pour une meilleure sécurité
   ECR_REGISTRY:
     ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION || 'us-east-1' }}.amazonaws.com
 
@@ -31,15 +30,14 @@ jobs:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest
     permissions:
-      id-token: write # Permet d'assumer un rôle IAM
+      id-token: write
       contents: read
     outputs:
-      image-tag: ${{ github.sha }} # Output de l'image taggée
+      image-tag: ${{ github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Utilise OIDC pour assumer le rôle ARN de déploiement
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -52,38 +50,30 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # -----------------------------------------------------------------------
       # Build & Push API Management
-      # -----------------------------------------------------------------------
       - name: Build and push API Management
         uses: docker/build-push-action@v5
         with:
           context: .
-          # ⚠️ CORRECTION: Utilisation du chemin correct pour un monorepo
           file: ./docker/api-management.Dockerfile
           push: true
           tags: |
             ${{ env.ECR_REGISTRY }}/feature-flags/api-management:${{ github.sha }}
             ${{ env.ECR_REGISTRY }}/feature-flags/api-management:latest
-          # Utilisation de l'image ECR existante comme cache primaire
           cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/feature-flags/api-management:latest
           cache-to:
             type=registry,ref=${{ env.ECR_REGISTRY }}/feature-flags/api-management:cache,mode=max
 
-      # -----------------------------------------------------------------------
       # Build & Push API Read
-      # -----------------------------------------------------------------------
       - name: Build and push API Read
         uses: docker/build-push-action@v5
         with:
           context: .
-          # ⚠️ CORRECTION: Utilisation du chemin correct pour un monorepo
           file: ./docker/api-read.Dockerfile
           push: true
           tags: |
             ${{ env.ECR_REGISTRY }}/feature-flags/api-read:${{ github.sha }}
             ${{ env.ECR_REGISTRY }}/feature-flags/api-read:latest
-          # Utilisation de l'image ECR existante comme cache primaire
           cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/feature-flags/api-read:latest
           cache-to: type=registry,ref=${{ env.ECR_REGISTRY }}/feature-flags/api-read:cache,mode=max
 
@@ -97,6 +87,8 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    outputs:
+      migration-task-family: ${{ steps.cdk_deploy.outputs.migration_task_family }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -116,85 +108,105 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # -----------------------------------------------------------------------
-      # 1. Deploy CDK Stack (Update Task Definitions & Infra)
-      # -----------------------------------------------------------------------
+      # Deploy CDK Stack
       - name: Deploy FeatureFlagsComputeStack and Get Outputs
         id: cdk_deploy
         run: |
           cd infrastructure
-          # Déploie la Task Definition de migration que vous venez de créer
           npx cdk deploy FeatureFlagsComputeStack \
             --require-approval never \
             --outputs-file cdk-outputs.json
 
-          # Récupère le nom de la Task Definition Family depuis l'output CDK
-          TASK_DEF_FAMILY=$(jq -r '.FeatureFlagsComputeStack.MigrationTaskDefFamily' cdk-outputs.json)
+          # Récupère le nom de la Task Definition Family
+          TASK_DEF_FAMILY=$(jq -r '.FeatureFlagsComputeStack.MigrationTaskDefFamily // "feature-flags-migration"' cdk-outputs.json)
           echo "migration_task_family=$TASK_DEF_FAMILY" >> $GITHUB_OUTPUT
+          echo "Migration Task Definition Family: $TASK_DEF_FAMILY"
 
-      # -----------------------------------------------------------------------
-      # 2. Run Database Migrations (Secure/Idempotent via Fargate)
-      # -----------------------------------------------------------------------
+      # Run Database Migrations
       - name: Run migration task
         env:
           MIGRATION_TASK_DEF_FAMILY: ${{ steps.cdk_deploy.outputs.migration_task_family }}
-          # Exposer les secrets au script Bash pour les nettoyer
-          PRIVATE_SUBNET_IDS: ${{ secrets.PRIVATE_SUBNET_IDS }}
-          APP_SECURITY_GROUP_ID: ${{ secrets.APP_SECURITY_GROUP_ID }}
         run: |
           echo "Migration Task Definition Family: $MIGRATION_TASK_DEF_FAMILY"
 
-          # 🚨 CORRECTION SYNTAXE ET LOGIQUE : Rétablir la structure if/then/fi complète.
-          # Vérification de l'existence de la Task Definition Family
+          # Validation de la Task Definition Family
           if [ -z "$MIGRATION_TASK_DEF_FAMILY" ] || [ "$MIGRATION_TASK_DEF_FAMILY" == "null" ]; then
-            echo "❌ Erreur: La Task Definition Family (FeatureFlagsMigrationTaskDefFamily) n'a pas été trouvée dans les outputs CDK."
-            # Utilisation de la valeur par défaut connue si l'output n'est pas trouvé
+            echo "❌ Erreur: Task Definition Family non trouvée"
             MIGRATION_TASK_DEF_FAMILY="feature-flags-migration"
-            echo "Tentative d'utilisation de la valeur par défaut: $MIGRATION_TASK_DEF_FAMILY"
+            echo "Utilisation de la valeur par défaut: $MIGRATION_TASK_DEF_FAMILY"
           fi
 
-          # 🚨 CORRECTION RÉSEAU : Nettoyage robuste des variables pour éviter InvalidParameterException.
-          # Utilisation de pipes pour éviter les erreurs de guillemets Bash.
-          CLEAN_SUBNETS=$(echo "$PRIVATE_SUBNET_IDS" | tr -d '\n\r ' | tr -d '"' | tr -d "'")
-          CLEAN_SG_ID=$(echo "$APP_SECURITY_GROUP_ID" | tr -d '\n\r ' | tr -d '"' | tr -d "'")
+          # Récupération des subnet IDs depuis CloudFormation
+          SUBNET_IDS=$(aws cloudformation describe-stacks \
+            --stack-name FeatureFlagsNetworkStack \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Stacks[0].Outputs[?OutputKey==`PrivateSubnets`].OutputValue' \
+            --output text)
 
-          echo "Using Cleaned Subnets: $CLEAN_SUBNETS"
-          echo "Using Cleaned SG ID: $CLEAN_SG_ID"
+          # Récupération du Security Group ID depuis CloudFormation
+          SG_ID=$(aws cloudformation describe-stacks \
+            --stack-name FeatureFlagsNetworkStack \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Stacks[0].Outputs[?contains(OutputKey, `AppSG`)].OutputValue' \
+            --output text | head -n1)
 
+          echo "Using Subnets: $SUBNET_IDS"
+          echo "Using Security Group: $SG_ID"
+
+          # Validation
+          if [ -z "$SUBNET_IDS" ] || [ -z "$SG_ID" ]; then
+            echo "❌ Erreur: Subnets ou Security Group non trouvés"
+            exit 1
+          fi
+
+          # Lancement de la tâche de migration
           TASK_ARN=$(aws ecs run-task \
             --cluster feature-flags-cluster \
             --task-definition $MIGRATION_TASK_DEF_FAMILY \
             --launch-type FARGATE \
-            --network-configuration "awsvpcConfiguration={subnets=[$CLEAN_SUBNETS],securityGroups=[$CLEAN_SG_ID],assignPublicIp=DISABLED}" \
+            --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_IDS],securityGroups=[$SG_ID],assignPublicIp=DISABLED}" \
             --overrides '{
               "containerOverrides": [{
                 "name": "migration",
-                "command": ["npm", "run", "db:migrate:prod"]
+                "command": ["sh", "-c", "cd packages/database && npm run db:migrate:prod"]
               }]
             }' \
+            --region ${{ env.AWS_REGION }} \
             --query 'tasks[0].taskArn' \
             --output text)
-            
-          echo "Waiting for migration task: $TASK_ARN"  
 
+          if [ -z "$TASK_ARN" ] || [ "$TASK_ARN" == "None" ]; then
+            echo "❌ Erreur: Impossible de lancer la tâche de migration"
+            exit 1
+          fi
+
+          echo "✅ Tâche de migration lancée: $TASK_ARN"
+          echo "Attente de la fin de la migration..."
+
+          # Attendre la fin de la tâche
           aws ecs wait tasks-stopped \
             --cluster feature-flags-cluster \
-            --tasks $TASK_ARN
+            --tasks $TASK_ARN \
+            --region ${{ env.AWS_REGION }}
 
+          # Vérifier le code de sortie
           EXIT_CODE=$(aws ecs describe-tasks \
             --cluster feature-flags-cluster \
             --tasks $TASK_ARN \
+            --region ${{ env.AWS_REGION }} \
             --query 'tasks[0].containers[0].exitCode' \
             --output text)
 
           if [ "$EXIT_CODE" != "0" ]; then
-            echo "Migration failed with exit code: $EXIT_CODE"
-            # Afficher les logs de la tâche en cas d'échec pour un meilleur debug
-            aws logs tail /ecs/feature-flags/migration --since 1h --filter $TASK_ARN --region ${{ env.AWS_REGION }}
+            echo "❌ Migration échouée avec le code: $EXIT_CODE"
+            echo "Récupération des logs..."
+            aws logs tail /ecs/feature-flags/migration \
+              --since 1h \
+              --region ${{ env.AWS_REGION }} || true
             exit 1
           fi
 
-          echo "Migration completed successfully"
+          echo "✅ Migration terminée avec succès"
 
   # ===========================================================================
   # UPDATE ECS SERVICES AND HEALTH CHECK
@@ -202,7 +214,7 @@ jobs:
   deploy-services:
     name: Update ECS Services & Check
     runs-on: ubuntu-latest
-    needs: [build-and-push, cdk-deploy] # Dépendances sur les images et le CDK/Migration
+    needs: [build-and-push, cdk-deploy]
     permissions:
       id-token: write
       contents: read
@@ -216,58 +228,59 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # Les task definitions ont été mises à jour par le job 'cdk-deploy'.
-      # On force un redéploiement pour utiliser la nouvelle task definition.
+      # Force new deployment avec la nouvelle image
       - name: Update ECS Services - Force New Deployment
         run: |
           aws ecs update-service \
             --cluster feature-flags-cluster \
             --service feature-flags-management \
             --force-new-deployment \
-            --desired-count 2
+            --region ${{ env.AWS_REGION }}
 
           aws ecs update-service \
             --cluster feature-flags-cluster \
             --service feature-flags-read \
             --force-new-deployment \
-            --desired-count 3
+            --region ${{ env.AWS_REGION }}
 
       - name: Wait for services to stabilize
         run: |
-          echo "Waiting for Management API..."
+          echo "⏳ Attente de la stabilisation du service Management..."
           aws ecs wait services-stable \
             --cluster feature-flags-cluster \
-            --services feature-flags-management
+            --services feature-flags-management \
+            --region ${{ env.AWS_REGION }}
 
-          echo "Waiting for Read API..."
+          echo "⏳ Attente de la stabilisation du service Read..."
           aws ecs wait services-stable \
             --cluster feature-flags-cluster \
-            --services feature-flags-read
+            --services feature-flags-read \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✅ Services stabilisés"
 
       - name: Get ALB URL
         id: get-url
         run: |
-          # Récupère l'URL de l'ALB depuis les outputs de la stack CDK
           ALB_DNS=$(aws cloudformation describe-stacks \
             --stack-name FeatureFlagsComputeStack \
+            --region ${{ env.AWS_REGION }} \
             --query 'Stacks[0].Outputs[?OutputKey==`ALBDNSName`].OutputValue' \
             --output text)
 
-          # Expose l'URL pour le Health Check et la notification
           echo "url=http://$ALB_DNS" >> $GITHUB_OUTPUT
+          echo "ALB URL: http://$ALB_DNS"
 
-      # -----------------------------------------------------------------------
-      # Health Check (Validation finale)
-      # -----------------------------------------------------------------------
+      # Health Check
       - name: Health check
         run: |
           URL="${{ steps.get-url.outputs.url }}/api/v1/management/health"
           MAX_RETRIES=15 
           RETRY_COUNT=0
 
-          echo "Démarrage du Health Check sur $URL"
+          echo "🔍 Démarrage du Health Check sur $URL"
+
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            # Utilisation de cURL avec un timeout et récupération du code HTTP
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 10 "$URL" || echo "000")
 
             if [ "$HTTP_CODE" = "200" ]; then
@@ -276,7 +289,7 @@ jobs:
             fi
 
             RETRY_COUNT=$((RETRY_COUNT + 1))
-            echo "Health check failed (HTTP $HTTP_CODE) for $URL, retrying in 20s... ($RETRY_COUNT/$MAX_RETRIES)"
+            echo "⏳ Health check failed (HTTP $HTTP_CODE), retrying in 20s... ($RETRY_COUNT/$MAX_RETRIES)"
             sleep 20
           done
 
@@ -293,6 +306,7 @@ jobs:
     if: always()
     steps:
       - name: Send Slack notification
+        if: vars.SLACK_WEBHOOK_URL != ''
         uses: slackapi/slack-github-action@v1
         with:
           payload: |

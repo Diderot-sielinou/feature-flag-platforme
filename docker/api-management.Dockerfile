@@ -114,6 +114,13 @@ COPY --from=builder --chown=nestjs:nodejs /app/packages/database/dist ./packages
 COPY --from=builder --chown=nestjs:nodejs /app/packages/database/package.json ./packages/database/
 COPY --from=builder --chown=nestjs:nodejs /app/packages/database/prisma ./packages/database/prisma
 
+# ================================
+# 🆕 MIGRATION SCRIPT
+# ================================
+# Copier le script de migration et le rendre exécutable
+COPY --from=builder --chown=nestjs:nodejs /app/packages/database/migrate.sh ./packages/database/migrate.sh
+RUN chmod +x ./packages/database/migrate.sh
+
 # Passer à l'utilisateur non-root
 USER nestjs
 

@@ -168,7 +168,7 @@ jobs:
             --overrides '{
               "containerOverrides": [{
                 "name": "migration",
-                "command": ["sh", "-c", "cd packages/database && npm run db:migrate:prod"]
+                "command": ["sh", "/app/packages/database/migrate.sh"]
               }]
             }' \
             --region ${{ env.AWS_REGION }} \

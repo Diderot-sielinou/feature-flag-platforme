@@ -110,9 +110,6 @@ jobs:
       - name: Install Monorepo Dependencies
         run: npm ci
 
-      - name: Install CDK Dependencies
-        run: npm ci --prefix infrastructure
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:

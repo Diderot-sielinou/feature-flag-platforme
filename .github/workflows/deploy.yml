@@ -149,22 +149,21 @@ jobs:
             echo "Tentative d'utilisation de la valeur par défaut: $MIGRATION_TASK_DEF_FAMILY"
           fi
 
-          TASK_ARN=$(aws ecs run-task \
+            TASK_ARN=$(aws ecs run-task \
             --cluster feature-flags-cluster \
             --task-definition $MIGRATION_TASK_DEF_FAMILY \
             --launch-type FARGATE \
             --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.PRIVATE_SUBNET_IDS }}],securityGroups=[${{ secrets.APP_SECURITY_GROUP_ID }}],assignPublicIp=DISABLED}" \
             --overrides '{
               "containerOverrides": [{
-                "name": "migration", # Doit correspondre au nom du conteneur dans votre Task Def
+                "name": "migration",
                 "command": ["npm", "run", "db:migrate:prod"]
               }]
             }' \
             --query 'tasks[0].taskArn' \
-            --output text > task_arn.txt
-            
-          TASK_ARN=$(cat task_arn.txt)
-          echo "Waiting for migration task: $TASK_ARN"
+            --output text) # <-- Supprimer le > task_arn.txt et la ligne suivante
+
+          echo "Waiting for migration task: $TASK_ARN"  
 
           aws ecs wait tasks-stopped \
             --cluster feature-flags-cluster \

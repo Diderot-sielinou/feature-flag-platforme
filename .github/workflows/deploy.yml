@@ -144,6 +144,7 @@ jobs:
         run: |
           echo "Migration Task Definition Family: $MIGRATION_TASK_DEF_FAMILY"
 
+          # 🚨 CORRECTION SYNTAXE ET LOGIQUE : Rétablir la structure if/then/fi complète.
           # Vérification de l'existence de la Task Definition Family
           if [ -z "$MIGRATION_TASK_DEF_FAMILY" ] || [ "$MIGRATION_TASK_DEF_FAMILY" == "null" ]; then
             echo "❌ Erreur: La Task Definition Family (FeatureFlagsMigrationTaskDefFamily) n'a pas été trouvée dans les outputs CDK."
@@ -152,10 +153,10 @@ jobs:
             echo "Tentative d'utilisation de la valeur par défaut: $MIGRATION_TASK_DEF_FAMILY"
           fi
 
-          # 🚨 CORRECTION FINALE : Nettoyage agressif des variables réseau pour éviter InvalidParameterException
-          # Supprime les sauts de ligne (\n, \r), les guillemets simples/doubles ('', ""), et tous les espaces.
-          CLEAN_SUBNETS=$(echo "$PRIVATE_SUBNET_IDS" | tr -d '\n\r\'\"[:space:]')
-          CLEAN_SG_ID=$(echo "$APP_SECURITY_GROUP_ID" | tr -d '\n\r\'\"[:space:]')
+          # 🚨 CORRECTION RÉSEAU : Nettoyage robuste des variables pour éviter InvalidParameterException.
+          # Utilisation de pipes pour éviter les erreurs de guillemets Bash.
+          CLEAN_SUBNETS=$(echo "$PRIVATE_SUBNET_IDS" | tr -d '\n\r ' | tr -d '"' | tr -d "'")
+          CLEAN_SG_ID=$(echo "$APP_SECURITY_GROUP_ID" | tr -d '\n\r ' | tr -d '"' | tr -d "'")
 
           echo "Using Cleaned Subnets: $CLEAN_SUBNETS"
           echo "Using Cleaned SG ID: $CLEAN_SG_ID"

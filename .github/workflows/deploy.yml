@@ -18,7 +18,8 @@ env:
   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }} # Utilisation de vars pour la région
   NODE_VERSION: '20'
   # Utilisation d'un secret pour l'ID de compte pour une meilleure sécurité
-  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+  ECR_REGISTRY:
+    ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION || 'us-east-1' }}.amazonaws.com
 
 jobs:
   # ===========================================================================
@@ -56,7 +57,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./apps/api-management/Dockerfile
+          file: ./docker/api-management/Dockerfile
           push: true
           tags: |
             ${{ env.ECR_REGISTRY }}/feature-flags/api-management:${{ github.sha }}
@@ -73,7 +74,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./apps/api-read/Dockerfile
+          file: ./docker/api-read/Dockerfile
           push: true
           tags: |
             ${{ env.ECR_REGISTRY }}/feature-flags/api-read:${{ github.sha }}
@@ -272,7 +273,6 @@ jobs:
     if: always()
     steps:
       - name: Send Slack notification
-        if: ${{ secrets.SLACK_WEBHOOK_URL }}
         uses: slackapi/slack-github-action@v1
         with:
           payload: |

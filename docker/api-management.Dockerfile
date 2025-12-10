@@ -73,6 +73,12 @@ RUN npm run db:generate
 
 # Build via Turbo (optimal pour monorepo)
 WORKDIR /app
+
+RUN npx turbo run build --filter=./packages/shared --filter=./packages/database
+
+# Ajoutez cette ligne de débogage:
+RUN echo "=== Vérification du contenu de shared/dist ===" && ls -la /app/packages/shared/dist/ || echo "dist/ n'existe pas"
+
 RUN npx turbo run build --filter=api-management
 
 # Vérification du build

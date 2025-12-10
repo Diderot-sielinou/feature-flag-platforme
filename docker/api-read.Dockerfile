@@ -72,6 +72,7 @@ RUN npm run db:generate
 
 # Build via Turbo (optimal pour monorepo)
 WORKDIR /app
+RUN npx turbo run build --filter=./packages/shared --filter=./packages/database
 RUN npx turbo run build --filter=api-read
 
 # Vérification du build

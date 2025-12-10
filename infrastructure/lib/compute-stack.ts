@@ -39,6 +39,8 @@ export interface ComputeStackProps extends cdk.StackProps {
 
   // Configuration
   isProduction?: boolean;
+  dashboardUrl?: string;
+  // docsUrl?: string;
 }
 
 /**
@@ -400,6 +402,10 @@ export class ComputeStack extends cdk.Stack {
       // SES Configuration
       SES_SENDER_EMAIL: props.senderEmail,
       SES_CONFIGURATION_SET: 'feature-flags-emails',
+
+      // App URLs (pour les liens dans les emails) - AJOUTER
+      DASHBOARD_URL: props.dashboardUrl || `http://${this.alb.loadBalancerDnsName}`,
+      // DOCS_URL: props.docsUrl || `http://${this.alb.loadBalancerDnsName}/docs`,
     };
 
     const managementEnv = {

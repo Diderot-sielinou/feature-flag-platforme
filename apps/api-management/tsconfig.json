@@ -5,20 +5,18 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "baseUrl": "./",
-
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "useDefineForClassFields": false,
-
     "paths": {
-      "@/*": ["src/*"],
+      "@/*": ["src/*"]
     }
   },
-  "include": ["src/**/*", "test/**/*", "**/*.ts"],
-  "exclude": ["node_modules", "dist"],
+  // ✅ CORRECTION : Ne pas inclure test/ dans la compilation principale
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "test"],
   "references": [
     { "path": "../../packages/shared" },
     { "path": "../../packages/database" }

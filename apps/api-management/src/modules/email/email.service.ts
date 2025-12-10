@@ -78,12 +78,17 @@ export class EmailService implements OnModuleInit {
     // - SES_CONFIGURATION_SET
     // - DASHBOARD_URL (à ajouter dans compute-stack si besoin)
 
-    this.isProduction = this.configService.get<string>('nodeEnv') === 'production';
-    this.isEnabled = this.configService.get<boolean>('email.enabled') ?? this.isProduction;
+    this.isProduction =
+      this.configService.get<string>('nodeEnv') === 'production';
+    this.isEnabled =
+      this.configService.get<boolean>('email.enabled') ?? this.isProduction;
     this.region = this.configService.get<string>('aws.region') || 'us-east-1';
     this.senderEmail = this.configService.get<string>('email.senderEmail')!;
-    this.senderName = this.configService.get<string>('email.senderName') || 'LaunchLayer';
-    this.configurationSet = this.configService.get<string>('email.configurationSet')!;
+    this.senderName =
+      this.configService.get<string>('email.senderName') || 'LaunchLayer';
+    this.configurationSet = this.configService.get<string>(
+      'email.configurationSet',
+    )!;
     this.replyToEmail = this.configService.get<string>('email.replyToEmail');
     this.dashboardUrl = this.configService.get<string>('app.dashboardUrl')!;
     this.docsUrl = this.configService.get<string>('app.docsUrl')!;
@@ -91,7 +96,9 @@ export class EmailService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     if (!this.isEnabled) {
-      this.logger.warn('📧 Email service is DISABLED (dev mode or EMAIL_ENABLED=false)');
+      this.logger.warn(
+        '📧 Email service is DISABLED (dev mode or EMAIL_ENABLED=false)',
+      );
       return;
     }
 
@@ -172,7 +179,9 @@ export class EmailService implements OnModuleInit {
    */
   async sendWelcomeEmail(data: WelcomeEmailData): Promise<boolean> {
     if (!this.isEnabled || !this.sesClient) {
-      this.logEmailDryRun('WELCOME', data.recipientEmail, { userName: data.userName });
+      this.logEmailDryRun('WELCOME', data.recipientEmail, {
+        userName: data.userName,
+      });
       return true;
     }
 
@@ -194,7 +203,10 @@ export class EmailService implements OnModuleInit {
       this.logger.log(`✅ Welcome email sent to ${data.recipientEmail}`);
       return true;
     } catch (error) {
-      this.logger.error(`❌ Failed to send welcome email to ${data.recipientEmail}`, error);
+      this.logger.error(
+        `❌ Failed to send welcome email to ${data.recipientEmail}`,
+        error,
+      );
       return false;
     }
   }
@@ -202,8 +214,14 @@ export class EmailService implements OnModuleInit {
   /**
    * Envoie une notification de changement de flag aux membres du projet
    */
-  async sendFlagChangeNotification(data: FlagChangeEmailData): Promise<boolean> {
-    if (!this.isEnabled || !this.sesClient || data.recipientEmails.length === 0) {
+  async sendFlagChangeNotification(
+    data: FlagChangeEmailData,
+  ): Promise<boolean> {
+    if (
+      !this.isEnabled ||
+      !this.sesClient ||
+      data.recipientEmails.length === 0
+    ) {
       this.logEmailDryRun('FLAG_CHANGE', data.recipientEmails.join(', '), {
         flagKey: data.flagKey,
         action: data.action,
@@ -234,7 +252,9 @@ export class EmailService implements OnModuleInit {
         ),
       );
 
-      const successCount = results.filter((r) => r.status === 'fulfilled').length;
+      const successCount = results.filter(
+        (r) => r.status === 'fulfilled',
+      ).length;
       this.logger.log(
         `✅ Flag change emails: ${successCount}/${data.recipientEmails.length} sent`,
       );
@@ -250,9 +270,13 @@ export class EmailService implements OnModuleInit {
    */
   async sendRawEmail(data: GenericEmailData): Promise<boolean> {
     if (!this.isEnabled || !this.sesClient) {
-      this.logEmailDryRun('RAW', Array.isArray(data.to) ? data.to.join(', ') : data.to, {
-        subject: data.subject,
-      });
+      this.logEmailDryRun(
+        'RAW',
+        Array.isArray(data.to) ? data.to.join(', ') : data.to,
+        {
+          subject: data.subject,
+        },
+      );
       return true;
     }
 
@@ -270,7 +294,9 @@ export class EmailService implements OnModuleInit {
         Subject: { Data: data.subject, Charset: 'UTF-8' },
         Body: {
           Html: { Data: data.htmlBody, Charset: 'UTF-8' },
-          ...(data.textBody && { Text: { Data: data.textBody, Charset: 'UTF-8' } }),
+          ...(data.textBody && {
+            Text: { Data: data.textBody, Charset: 'UTF-8' },
+          }),
         },
       },
       ConfigurationSetName: this.configurationSet,
@@ -661,7 +687,11 @@ LaunchLayer - Feature Flags Platform
     return text.replace(/[&<>"']/g, (char) => htmlEntities[char]);
   }
 
-  private logEmailDryRun(type: string, to: string, data: Record<string, unknown>): void {
+  private logEmailDryRun(
+    type: string,
+    to: string,
+    data: Record<string, unknown>,
+  ): void {
     this.logger.debug(`📧 [DRY RUN] ${type} email to ${to}`, data);
   }
 }

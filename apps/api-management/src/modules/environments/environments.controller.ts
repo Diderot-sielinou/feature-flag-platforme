@@ -17,7 +17,16 @@ import {
   ApiBearerAuth,
   ApiParam,
 } from '@nestjs/swagger';
-import { EnvironmentsService } from './environments.service';
+// import { ProjectRole } from '@prisma/client';
+
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import {
+  AdminOnly,
+  ViewerAndAbove,
+} from '../../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+
 import {
   CreateEnvironmentDto,
   UpdateEnvironmentDto,
@@ -26,11 +35,7 @@ import {
   EnvironmentWithStatsDto,
   RotateApiKeyResponseDto,
 } from './dto/environment.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Roles, AdminOnly, ViewerAndAbove } from '../../common/decorators/roles.decorator';
-import { ProjectRole } from '@prisma/client';
+import { EnvironmentsService } from './environments.service';
 
 @ApiTags('Environments')
 @ApiBearerAuth('JWT-auth')
@@ -59,7 +64,11 @@ export class EnvironmentsController {
     @Body() createEnvironmentDto: CreateEnvironmentDto,
     @CurrentUser('id') userId: string,
   ) {
-    return this.environmentsService.create(projectId, createEnvironmentDto, userId);
+    return await this.environmentsService.create(
+      projectId,
+      createEnvironmentDto,
+      userId,
+    );
   }
 
   // ==========================================================================
@@ -76,7 +85,7 @@ export class EnvironmentsController {
     type: [EnvironmentWithStatsDto],
   })
   async findAll(@Param('projectId') projectId: string) {
-    return this.environmentsService.findAllByProject(projectId);
+    return await this.environmentsService.findAllByProject(projectId);
   }
 
   @Get(':id')
@@ -91,7 +100,7 @@ export class EnvironmentsController {
   })
   @ApiResponse({ status: 404, description: 'Environment not found' })
   async findOne(@Param('id') id: string) {
-    return this.environmentsService.findOne(id);
+    return await this.environmentsService.findOne(id);
   }
 
   // ==========================================================================
@@ -115,7 +124,11 @@ export class EnvironmentsController {
     @Body() updateEnvironmentDto: UpdateEnvironmentDto,
     @CurrentUser('id') userId: string,
   ) {
-    return this.environmentsService.update(id, updateEnvironmentDto, userId);
+    return await this.environmentsService.update(
+      id,
+      updateEnvironmentDto,
+      userId,
+    );
   }
 
   // ==========================================================================
@@ -130,12 +143,12 @@ export class EnvironmentsController {
   @ApiParam({ name: 'id', description: 'Environment ID' })
   @ApiResponse({ status: 200, description: 'Environment deleted' })
   @ApiResponse({ status: 404, description: 'Environment not found' })
-  @ApiResponse({ status: 400, description: 'Cannot delete environment with flags' })
-  async delete(
-    @Param('id') id: string,
-    @CurrentUser('id') userId: string,
-  ) {
-    return this.environmentsService.delete(id, userId);
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot delete environment with flags',
+  })
+  async delete(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return await this.environmentsService.delete(id, userId);
   }
 
   // ==========================================================================
@@ -157,6 +170,6 @@ export class EnvironmentsController {
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
   ) {
-    return this.environmentsService.rotateApiKey(id, userId);
+    return await this.environmentsService.rotateApiKey(id, userId);
   }
 }

@@ -14,10 +14,12 @@ export default [
     },
   },
   {
-    // Règles personnalisées pour cette app si nécessaire
     rules: {
-      // Exemple : autoriser console.log en développement
-      // 'no-console': process.env.NODE_ENV === 'production' ? 'error' : 'off',
     },
+  },
+  {
+    ignores: [
+      '**/*.d.ts',
+    ],
   },
 ];

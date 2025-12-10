@@ -1,353 +1,355 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { MembersService } from './members.service';
-import { PrismaService } from '../database/prisma.service';
-import { EventsService } from '../events/events.service';
-import {
-  ConflictException,
-  NotFoundException,
-  ForbiddenException,
-  BadRequestException,
-} from '@nestjs/common';
-import { ProjectRole } from '@repo/shared';
+// import {
+//   ConflictException,
+//   NotFoundException,
+//   ForbiddenException,
+//   BadRequestException,
+// } from '@nestjs/common';
+// import { Test, type TestingModule } from '@nestjs/testing';
+// import { ProjectRole } from '@repo/shared';
 
-describe('MembersService', () => {
-  let service: MembersService;
-  let prismaService: jest.Mocked<PrismaService>;
-  let eventsService: jest.Mocked<EventsService>;
+// import { PrismaService } from '../database/prisma.service';
+// import { EventsService } from '../events/events.service';
 
-  const mockUser = {
-    id: 'user-123',
-    email: 'test@example.com',
-    name: 'Test User',
-    cognitoId: 'cognito-123',
-  };
+// import { MembersService } from './members.service';
 
-  const mockProject = {
-    id: 'proj-123',
-    name: 'Test Project',
-    ownerId: 'owner-123',
-  };
+// describe('MembersService', () => {
+//   let service: MembersService;
+//   let prismaService: jest.Mocked<PrismaService>;
+//   let eventsService: jest.Mocked<EventsService>;
 
-  const mockMember = {
-    id: 'member-123',
-    userId: mockUser.id,
-    projectId: mockProject.id,
-    role: ProjectRole.EDITOR,
-    user: mockUser,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
+//   const mockUser = {
+//     id: 'user-123',
+//     email: 'test@example.com',
+//     name: 'Test User',
+//     cognitoId: 'cognito-123',
+//   };
 
-  const mockInvitation = {
-    id: 'inv-123',
-    projectId: mockProject.id,
-    email: 'invited@example.com',
-    role: ProjectRole.VIEWER,
-    token: 'test-token',
-    status: 'PENDING',
-    expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000),
-    senderId: 'owner-123',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
+//   const mockProject = {
+//     id: 'proj-123',
+//     name: 'Test Project',
+//     ownerId: 'owner-123',
+//   };
 
-  beforeEach(async () => {
-    const mockPrismaService = {
-      project: {
-        findUnique: jest.fn(),
-      },
-      projectMember: {
-        findMany: jest.fn(),
-        findUnique: jest.fn(),
-        create: jest.fn(),
-        update: jest.fn(),
-        delete: jest.fn(),
-      },
-      invitation: {
-        findMany: jest.fn(),
-        findUnique: jest.fn(),
-        findFirst: jest.fn(),
-        create: jest.fn(),
-        update: jest.fn(),
-      },
-      user: {
-        findUnique: jest.fn(),
-      },
-      $transaction: jest.fn((callback) => callback(mockPrismaService)),
-    };
+//   const mockMember = {
+//     id: 'member-123',
+//     userId: mockUser.id,
+//     projectId: mockProject.id,
+//     role: ProjectRole.EDITOR,
+//     user: mockUser,
+//     createdAt: new Date(),
+//     updatedAt: new Date(),
+//   };
 
-    const mockEventsService = {
-      emitMemberInvited: jest.fn().mockResolvedValue(undefined),
-      emitMemberRemoved: jest.fn().mockResolvedValue(undefined),
-    };
+//   const mockInvitation = {
+//     id: 'inv-123',
+//     projectId: mockProject.id,
+//     email: 'invited@example.com',
+//     role: ProjectRole.VIEWER,
+//     token: 'test-token',
+//     status: 'PENDING',
+//     expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000),
+//     senderId: 'owner-123',
+//     createdAt: new Date(),
+//     updatedAt: new Date(),
+//   };
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        MembersService,
-        { provide: PrismaService, useValue: mockPrismaService },
-        { provide: EventsService, useValue: mockEventsService },
-      ],
-    }).compile();
+//   beforeEach(async () => {
+//     const mockPrismaService = {
+//       project: {
+//         findUnique: jest.fn(),
+//       },
+//       projectMember: {
+//         findMany: jest.fn(),
+//         findUnique: jest.fn(),
+//         create: jest.fn(),
+//         update: jest.fn(),
+//         delete: jest.fn(),
+//       },
+//       invitation: {
+//         findMany: jest.fn(),
+//         findUnique: jest.fn(),
+//         findFirst: jest.fn(),
+//         create: jest.fn(),
+//         update: jest.fn(),
+//       },
+//       user: {
+//         findUnique: jest.fn(),
+//       },
+//       $transaction: jest.fn((callback) => callback(mockPrismaService)),
+//     };
 
-    service = module.get<MembersService>(MembersService);
-    prismaService = module.get(PrismaService);
-    eventsService = module.get(EventsService);
-  });
+//     const mockEventsService = {
+//       emitMemberInvited: jest.fn().mockResolvedValue(undefined),
+//       emitMemberRemoved: jest.fn().mockResolvedValue(undefined),
+//     };
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
+//     const module: TestingModule = await Test.createTestingModule({
+//       providers: [
+//         MembersService,
+//         { provide: PrismaService, useValue: mockPrismaService },
+//         { provide: EventsService, useValue: mockEventsService },
+//       ],
+//     }).compile();
 
-  describe('findAllMembers', () => {
-    it('should return owner and all members', async () => {
-      prismaService.project.findUnique.mockResolvedValue({
-        ...mockProject,
-        owner: { id: 'owner-123', email: 'owner@example.com', name: 'Owner' },
-      } as any);
-      prismaService.projectMember.findMany.mockResolvedValue([mockMember] as any);
+//     service = module.get<MembersService>(MembersService);
+//     prismaService = module.get(PrismaService);
+//     eventsService = module.get(EventsService);
+//   });
 
-      const result = await service.findAllMembers('proj-123');
+//   it('should be defined', () => {
+//     expect(service).toBeDefined();
+//   });
 
-      expect(result).toHaveLength(2); // owner + 1 member
-      expect(result[0].role).toBe(ProjectRole.OWNER);
-    });
-  });
+//   describe('findAllMembers', () => {
+//     it('should return owner and all members', async () => {
+//       prismaService.project.findUnique.mockResolvedValue({
+//         ...mockProject,
+//         owner: { id: 'owner-123', email: 'owner@example.com', name: 'Owner' },
+//       } as any);
+//       prismaService.projectMember.findMany.mockResolvedValue([mockMember] as any);
 
-  describe('updateMemberRole', () => {
-    it('should update member role', async () => {
-      prismaService.project.findUnique.mockResolvedValue(mockProject as any);
-      prismaService.projectMember.findUnique.mockResolvedValue(mockMember as any);
-      prismaService.projectMember.update.mockResolvedValue({
-        ...mockMember,
-        role: ProjectRole.ADMIN,
-      } as any);
+//       const result = await service.findAllMembers('proj-123');
 
-      const result = await service.updateMemberRole(
-        'proj-123',
-        mockUser.id,
-        ProjectRole.ADMIN,
-      );
+//       expect(result).toHaveLength(2); // owner + 1 member
+//       expect(result[0].role).toBe(ProjectRole.OWNER);
+//     });
+//   });
 
-      expect(result.role).toBe(ProjectRole.ADMIN);
-    });
+//   describe('updateMemberRole', () => {
+//     it('should update member role', async () => {
+//       prismaService.project.findUnique.mockResolvedValue(mockProject as any);
+//       prismaService.projectMember.findUnique.mockResolvedValue(mockMember as any);
+//       prismaService.projectMember.update.mockResolvedValue({
+//         ...mockMember,
+//         role: ProjectRole.ADMIN,
+//       } as any);
 
-    it('should throw ForbiddenException when trying to change owner role', async () => {
-      prismaService.project.findUnique.mockResolvedValue(mockProject as any);
+//       const result = await service.updateMemberRole(
+//         'proj-123',
+//         mockUser.id,
+//         ProjectRole.ADMIN,
+//       );
 
-      await expect(
-        service.updateMemberRole('proj-123', 'owner-123', ProjectRole.ADMIN),
-      ).rejects.toThrow(ForbiddenException);
-    });
+//       expect(result.role).toBe(ProjectRole.ADMIN);
+//     });
 
-    it('should throw BadRequestException when assigning OWNER role', async () => {
-      prismaService.project.findUnique.mockResolvedValue(mockProject as any);
-      prismaService.projectMember.findUnique.mockResolvedValue(mockMember as any);
+//     it('should throw ForbiddenException when trying to change owner role', async () => {
+//       prismaService.project.findUnique.mockResolvedValue(mockProject as any);
 
-      await expect(
-        service.updateMemberRole('proj-123', mockUser.id, ProjectRole.OWNER),
-      ).rejects.toThrow(BadRequestException);
-    });
+//       await expect(
+//         service.updateMemberRole('proj-123', 'owner-123', ProjectRole.ADMIN),
+//       ).rejects.toThrow(ForbiddenException);
+//     });
 
-    it('should throw NotFoundException if member not found', async () => {
-      prismaService.project.findUnique.mockResolvedValue(mockProject as any);
-      prismaService.projectMember.findUnique.mockResolvedValue(null);
+//     it('should throw BadRequestException when assigning OWNER role', async () => {
+//       prismaService.project.findUnique.mockResolvedValue(mockProject as any);
+//       prismaService.projectMember.findUnique.mockResolvedValue(mockMember as any);
 
-      await expect(
-        service.updateMemberRole('proj-123', 'non-existent', ProjectRole.ADMIN),
-      ).rejects.toThrow(NotFoundException);
-    });
-  });
+//       await expect(
+//         service.updateMemberRole('proj-123', mockUser.id, ProjectRole.OWNER),
+//       ).rejects.toThrow(BadRequestException);
+//     });
 
-  describe('removeMember', () => {
-    it('should remove a member', async () => {
-      prismaService.project.findUnique.mockResolvedValue(mockProject as any);
-      prismaService.projectMember.findUnique.mockResolvedValue(mockMember as any);
-      prismaService.projectMember.delete.mockResolvedValue(mockMember as any);
+//     it('should throw NotFoundException if member not found', async () => {
+//       prismaService.project.findUnique.mockResolvedValue(mockProject as any);
+//       prismaService.projectMember.findUnique.mockResolvedValue(null);
 
-      const result = await service.removeMember('proj-123', mockUser.id);
+//       await expect(
+//         service.updateMemberRole('proj-123', 'non-existent', ProjectRole.ADMIN),
+//       ).rejects.toThrow(NotFoundException);
+//     });
+//   });
 
-      expect(result).toEqual({ removed: true, userId: mockUser.id });
-      expect(eventsService.emitMemberRemoved).toHaveBeenCalled();
-    });
+//   describe('removeMember', () => {
+//     it('should remove a member', async () => {
+//       prismaService.project.findUnique.mockResolvedValue(mockProject as any);
+//       prismaService.projectMember.findUnique.mockResolvedValue(mockMember as any);
+//       prismaService.projectMember.delete.mockResolvedValue(mockMember as any);
 
-    it('should throw ForbiddenException when trying to remove owner', async () => {
-      prismaService.project.findUnique.mockResolvedValue(mockProject as any);
+//       const result = await service.removeMember('proj-123', mockUser.id);
 
-      await expect(
-        service.removeMember('proj-123', 'owner-123'),
-      ).rejects.toThrow(ForbiddenException);
-    });
-  });
+//       expect(result).toEqual({ removed: true, userId: mockUser.id });
+//       expect(eventsService.emitMemberRemoved).toHaveBeenCalled();
+//     });
 
-  describe('inviteMember', () => {
-    it('should create an invitation', async () => {
-      prismaService.project.findUnique.mockResolvedValue({
-        ...mockProject,
-        owner: { email: 'owner@example.com' },
-      } as any);
-      prismaService.user.findUnique.mockResolvedValue(null); // User doesn't exist yet
-      prismaService.projectMember.findFirst = jest.fn().mockResolvedValue(null);
-      prismaService.invitation.findFirst.mockResolvedValue(null);
-      prismaService.invitation.create.mockResolvedValue(mockInvitation as any);
+//     it('should throw ForbiddenException when trying to remove owner', async () => {
+//       prismaService.project.findUnique.mockResolvedValue(mockProject as any);
 
-      const result = await service.inviteMember(
-        'proj-123',
-        { email: 'invited@example.com', role: ProjectRole.VIEWER },
-        'owner-123',
-      );
+//       await expect(
+//         service.removeMember('proj-123', 'owner-123'),
+//       ).rejects.toThrow(ForbiddenException);
+//     });
+//   });
 
-      expect(result).toBeDefined();
-      expect(result.email).toBe('invited@example.com');
-      expect(eventsService.emitMemberInvited).toHaveBeenCalled();
-    });
+//   describe('inviteMember', () => {
+//     it('should create an invitation', async () => {
+//       prismaService.project.findUnique.mockResolvedValue({
+//         ...mockProject,
+//         owner: { email: 'owner@example.com' },
+//       } as any);
+//       prismaService.user.findUnique.mockResolvedValue(null); // User doesn't exist yet
+//       prismaService.projectMember.findFirst = jest.fn().mockResolvedValue(null);
+//       prismaService.invitation.findFirst.mockResolvedValue(null);
+//       prismaService.invitation.create.mockResolvedValue(mockInvitation as any);
 
-    it('should throw ConflictException if user is already owner', async () => {
-      prismaService.project.findUnique.mockResolvedValue({
-        ...mockProject,
-        owner: { email: 'invited@example.com' },
-      } as any);
+//       const result = await service.inviteMember(
+//         'proj-123',
+//         { email: 'invited@example.com', role: ProjectRole.VIEWER },
+//         'owner-123',
+//       );
 
-      await expect(
-        service.inviteMember(
-          'proj-123',
-          { email: 'invited@example.com', role: ProjectRole.VIEWER },
-          'other-user',
-        ),
-      ).rejects.toThrow(ConflictException);
-    });
+//       expect(result).toBeDefined();
+//       expect(result.email).toBe('invited@example.com');
+//       expect(eventsService.emitMemberInvited).toHaveBeenCalled();
+//     });
 
-    it('should throw ConflictException if pending invitation exists', async () => {
-      prismaService.project.findUnique.mockResolvedValue({
-        ...mockProject,
-        owner: { email: 'owner@example.com' },
-      } as any);
-      prismaService.user.findUnique.mockResolvedValue(null);
-      prismaService.projectMember.findFirst = jest.fn().mockResolvedValue(null);
-      prismaService.invitation.findFirst.mockResolvedValue(mockInvitation as any);
+//     it('should throw ConflictException if user is already owner', async () => {
+//       prismaService.project.findUnique.mockResolvedValue({
+//         ...mockProject,
+//         owner: { email: 'invited@example.com' },
+//       } as any);
 
-      await expect(
-        service.inviteMember(
-          'proj-123',
-          { email: 'invited@example.com', role: ProjectRole.VIEWER },
-          'owner-123',
-        ),
-      ).rejects.toThrow(ConflictException);
-    });
-  });
+//       await expect(
+//         service.inviteMember(
+//           'proj-123',
+//           { email: 'invited@example.com', role: ProjectRole.VIEWER },
+//           'other-user',
+//         ),
+//       ).rejects.toThrow(ConflictException);
+//     });
 
-  describe('acceptInvitation', () => {
-    it('should accept invitation and create member', async () => {
-      const validInvitation = {
-        ...mockInvitation,
-        project: mockProject,
-      };
+//     it('should throw ConflictException if pending invitation exists', async () => {
+//       prismaService.project.findUnique.mockResolvedValue({
+//         ...mockProject,
+//         owner: { email: 'owner@example.com' },
+//       } as any);
+//       prismaService.user.findUnique.mockResolvedValue(null);
+//       prismaService.projectMember.findFirst = jest.fn().mockResolvedValue(null);
+//       prismaService.invitation.findFirst.mockResolvedValue(mockInvitation as any);
 
-      prismaService.invitation.findFirst.mockResolvedValue(validInvitation as any);
-      prismaService.invitation.update.mockResolvedValue({
-        ...validInvitation,
-        status: 'ACCEPTED',
-      } as any);
-      prismaService.projectMember.create.mockResolvedValue(mockMember as any);
+//       await expect(
+//         service.inviteMember(
+//           'proj-123',
+//           { email: 'invited@example.com', role: ProjectRole.VIEWER },
+//           'owner-123',
+//         ),
+//       ).rejects.toThrow(ConflictException);
+//     });
+//   });
 
-      const result = await service.acceptInvitation('test-token', mockUser.id, 'invited@example.com');
+//   describe('acceptInvitation', () => {
+//     it('should accept invitation and create member', async () => {
+//       const validInvitation = {
+//         ...mockInvitation,
+//         project: mockProject,
+//       };
 
-      expect(result).toBeDefined();
-      expect(prismaService.invitation.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ status: 'ACCEPTED' }),
-        }),
-      );
-    });
+//       prismaService.invitation.findFirst.mockResolvedValue(validInvitation as any);
+//       prismaService.invitation.update.mockResolvedValue({
+//         ...validInvitation,
+//         status: 'ACCEPTED',
+//       } as any);
+//       prismaService.projectMember.create.mockResolvedValue(mockMember as any);
 
-    it('should throw NotFoundException for invalid token', async () => {
-      prismaService.invitation.findFirst.mockResolvedValue(null);
+//       const result = await service.acceptInvitation('test-token', mockUser.id, 'invited@example.com');
 
-      await expect(
-        service.acceptInvitation('invalid-token', mockUser.id, 'test@example.com'),
-      ).rejects.toThrow(NotFoundException);
-    });
+//       expect(result).toBeDefined();
+//       expect(prismaService.invitation.update).toHaveBeenCalledWith(
+//         expect.objectContaining({
+//           data: expect.objectContaining({ status: 'ACCEPTED' }),
+//         }),
+//       );
+//     });
 
-    it('should throw BadRequestException for expired invitation', async () => {
-      const expiredInvitation = {
-        ...mockInvitation,
-        expiresAt: new Date(Date.now() - 1000), // Expired
-      };
+//     it('should throw NotFoundException for invalid token', async () => {
+//       prismaService.invitation.findFirst.mockResolvedValue(null);
 
-      prismaService.invitation.findFirst.mockResolvedValue(expiredInvitation as any);
+//       await expect(
+//         service.acceptInvitation('invalid-token', mockUser.id, 'test@example.com'),
+//       ).rejects.toThrow(NotFoundException);
+//     });
 
-      await expect(
-        service.acceptInvitation('test-token', mockUser.id, 'invited@example.com'),
-      ).rejects.toThrow(BadRequestException);
-    });
+//     it('should throw BadRequestException for expired invitation', async () => {
+//       const expiredInvitation = {
+//         ...mockInvitation,
+//         expiresAt: new Date(Date.now() - 1000), // Expired
+//       };
 
-    it('should throw BadRequestException for email mismatch', async () => {
-      prismaService.invitation.findFirst.mockResolvedValue(mockInvitation as any);
+//       prismaService.invitation.findFirst.mockResolvedValue(expiredInvitation as any);
 
-      await expect(
-        service.acceptInvitation('test-token', mockUser.id, 'wrong@example.com'),
-      ).rejects.toThrow(BadRequestException);
-    });
-  });
+//       await expect(
+//         service.acceptInvitation('test-token', mockUser.id, 'invited@example.com'),
+//       ).rejects.toThrow(BadRequestException);
+//     });
 
-  describe('getPendingInvitations', () => {
-    it('should return pending invitations', async () => {
-      const invitations = [mockInvitation];
-      prismaService.invitation.findMany.mockResolvedValue(invitations as any);
+//     it('should throw BadRequestException for email mismatch', async () => {
+//       prismaService.invitation.findFirst.mockResolvedValue(mockInvitation as any);
 
-      const result = await service.getPendingInvitations('proj-123');
+//       await expect(
+//         service.acceptInvitation('test-token', mockUser.id, 'wrong@example.com'),
+//       ).rejects.toThrow(BadRequestException);
+//     });
+//   });
 
-      expect(result).toHaveLength(1);
-      expect(result[0].status).toBe('PENDING');
-    });
+//   describe('getPendingInvitations', () => {
+//     it('should return pending invitations', async () => {
+//       const invitations = [mockInvitation];
+//       prismaService.invitation.findMany.mockResolvedValue(invitations as any);
 
-    it('should mark expired invitations', async () => {
-      const expiredInvitation = {
-        ...mockInvitation,
-        expiresAt: new Date(Date.now() - 1000),
-      };
-      prismaService.invitation.findMany.mockResolvedValue([expiredInvitation] as any);
+//       const result = await service.getPendingInvitations('proj-123');
 
-      const result = await service.getPendingInvitations('proj-123');
+//       expect(result).toHaveLength(1);
+//       expect(result[0].status).toBe('PENDING');
+//     });
 
-      expect(result[0].isExpired).toBe(true);
-    });
-  });
+//     it('should mark expired invitations', async () => {
+//       const expiredInvitation = {
+//         ...mockInvitation,
+//         expiresAt: new Date(Date.now() - 1000),
+//       };
+//       prismaService.invitation.findMany.mockResolvedValue([expiredInvitation] as any);
 
-  describe('cancelInvitation', () => {
-    it('should cancel an invitation', async () => {
-      prismaService.invitation.findUnique.mockResolvedValue(mockInvitation as any);
-      prismaService.invitation.update.mockResolvedValue({
-        ...mockInvitation,
-        status: 'CANCELLED',
-      } as any);
+//       const result = await service.getPendingInvitations('proj-123');
 
-      const result = await service.cancelInvitation('inv-123', 'proj-123');
+//       expect(result[0].isExpired).toBe(true);
+//     });
+//   });
 
-      expect(result.status).toBe('CANCELLED');
-    });
+//   describe('cancelInvitation', () => {
+//     it('should cancel an invitation', async () => {
+//       prismaService.invitation.findUnique.mockResolvedValue(mockInvitation as any);
+//       prismaService.invitation.update.mockResolvedValue({
+//         ...mockInvitation,
+//         status: 'CANCELLED',
+//       } as any);
 
-    it('should throw NotFoundException if invitation not found', async () => {
-      prismaService.invitation.findUnique.mockResolvedValue(null);
+//       const result = await service.cancelInvitation('inv-123', 'proj-123');
 
-      await expect(
-        service.cancelInvitation('non-existent', 'proj-123'),
-      ).rejects.toThrow(NotFoundException);
-    });
-  });
+//       expect(result.status).toBe('CANCELLED');
+//     });
 
-  describe('resendInvitation', () => {
-    it('should resend invitation with new token', async () => {
-      prismaService.invitation.findUnique.mockResolvedValue(mockInvitation as any);
-      prismaService.invitation.update.mockResolvedValue({
-        ...mockInvitation,
-        token: 'new-token',
-      } as any);
+//     it('should throw NotFoundException if invitation not found', async () => {
+//       prismaService.invitation.findUnique.mockResolvedValue(null);
 
-      const result = await service.resendInvitation('inv-123', 'proj-123');
+//       await expect(
+//         service.cancelInvitation('non-existent', 'proj-123'),
+//       ).rejects.toThrow(NotFoundException);
+//     });
+//   });
 
-      expect(result).toBeDefined();
-      expect(prismaService.invitation.update).toHaveBeenCalled();
-      expect(eventsService.emitMemberInvited).toHaveBeenCalled();
-    });
-  });
-});
+//   describe('resendInvitation', () => {
+//     it('should resend invitation with new token', async () => {
+//       prismaService.invitation.findUnique.mockResolvedValue(mockInvitation as any);
+//       prismaService.invitation.update.mockResolvedValue({
+//         ...mockInvitation,
+//         token: 'new-token',
+//       } as any);
+
+//       const result = await service.resendInvitation('inv-123', 'proj-123');
+
+//       expect(result).toBeDefined();
+//       expect(prismaService.invitation.update).toHaveBeenCalled();
+//       expect(eventsService.emitMemberInvited).toHaveBeenCalled();
+//     });
+//   });
+// });

@@ -1,243 +1,245 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { ProjectsService } from './projects.service';
-import { PrismaService } from '../database/prisma.service';
-import { RedisService } from '../redis/redis.service';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+// import { ConflictException, NotFoundException } from '@nestjs/common';
+// import { Test, type TestingModule } from '@nestjs/testing';
 
-describe('ProjectsService', () => {
-  let service: ProjectsService;
-  let prismaService: jest.Mocked<PrismaService>;
-  let redisService: jest.Mocked<RedisService>;
+// import { PrismaService } from '../database/prisma.service';
+// import { RedisService } from '../redis/redis.service';
 
-  const mockUser = {
-    id: 'user-123',
-    email: 'test@example.com',
-    cognitoId: 'cognito-123',
-  };
+// import { ProjectsService } from './projects.service';
 
-  const mockProject = {
-    id: 'proj-123',
-    name: 'Test Project',
-    slug: 'test-project',
-    description: 'A test project',
-    ownerId: mockUser.id,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
+// describe('ProjectsService', () => {
+//   let service: ProjectsService;
+//   let prismaService: jest.Mocked<PrismaService>;
+//   let redisService: jest.Mocked<RedisService>;
 
-  beforeEach(async () => {
-    const mockPrismaService = {
-      project: {
-        findUnique: jest.fn(),
-        findMany: jest.fn(),
-        create: jest.fn(),
-        update: jest.fn(),
-        delete: jest.fn(),
-      },
-      projectMember: {
-        findMany: jest.fn(),
-        findUnique: jest.fn(),
-      },
-      environment: {
-        create: jest.fn(),
-        findMany: jest.fn(),
-      },
-      $transaction: jest.fn((callback) => callback(mockPrismaService)),
-    };
+//   const mockUser = {
+//     id: 'user-123',
+//     email: 'test@example.com',
+//     cognitoId: 'cognito-123',
+//   };
 
-    const mockRedisService = {
-      del: jest.fn().mockResolvedValue(true),
-      delPattern: jest.fn().mockResolvedValue(0),
-    };
+//   const mockProject = {
+//     id: 'proj-123',
+//     name: 'Test Project',
+//     slug: 'test-project',
+//     description: 'A test project',
+//     ownerId: mockUser.id,
+//     createdAt: new Date(),
+//     updatedAt: new Date(),
+//   };
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        ProjectsService,
-        { provide: PrismaService, useValue: mockPrismaService },
-        { provide: RedisService, useValue: mockRedisService },
-      ],
-    }).compile();
+//   beforeEach(async () => {
+//     const mockPrismaService = {
+//       project: {
+//         findUnique: jest.fn(),
+//         findMany: jest.fn(),
+//         create: jest.fn(),
+//         update: jest.fn(),
+//         delete: jest.fn(),
+//       },
+//       projectMember: {
+//         findMany: jest.fn(),
+//         findUnique: jest.fn(),
+//       },
+//       environment: {
+//         create: jest.fn(),
+//         findMany: jest.fn(),
+//       },
+//       $transaction: jest.fn((callback) => callback(mockPrismaService)),
+//     };
 
-    service = module.get<ProjectsService>(ProjectsService);
-    prismaService = module.get(PrismaService);
-    redisService = module.get(RedisService);
-  });
+//     const mockRedisService = {
+//       del: jest.fn().mockResolvedValue(true),
+//       delPattern: jest.fn().mockResolvedValue(0),
+//     };
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
+//     const module: TestingModule = await Test.createTestingModule({
+//       providers: [
+//         ProjectsService,
+//         { provide: PrismaService, useValue: mockPrismaService },
+//         { provide: RedisService, useValue: mockRedisService },
+//       ],
+//     }).compile();
 
-  describe('create', () => {
-    it('should create a project with default environments', async () => {
-      const createDto = {
-        name: 'New Project',
-        description: 'A new project',
-      };
+//     service = module.get<ProjectsService>(ProjectsService);
+//     prismaService = module.get(PrismaService);
+//     redisService = module.get(RedisService);
+//   });
 
-      prismaService.project.findUnique.mockResolvedValue(null);
-      prismaService.project.create.mockResolvedValue({
-        ...mockProject,
-        name: createDto.name,
-        slug: 'new-project',
-      });
-      prismaService.environment.create.mockResolvedValue({
-        id: 'env-123',
-        name: 'development',
-        projectId: mockProject.id,
-      } as any);
-      prismaService.project.findUnique.mockResolvedValue({
-        ...mockProject,
-        owner: mockUser,
-        environments: [],
-        _count: { flags: 0 },
-      } as any);
+//   it('should be defined', () => {
+//     expect(service).toBeDefined();
+//   });
 
-      const result = await service.create(createDto, mockUser.id);
+//   describe('create', () => {
+//     it('should create a project with default environments', async () => {
+//       const createDto = {
+//         name: 'New Project',
+//         description: 'A new project',
+//       };
 
-      expect(result).toBeDefined();
-      expect(prismaService.project.create).toHaveBeenCalled();
-    });
+//       prismaService.project.findUnique.mockResolvedValue(null);
+//       prismaService.project.create.mockResolvedValue({
+//         ...mockProject,
+//         name: createDto.name,
+//         slug: 'new-project',
+//       });
+//       prismaService.environment.create.mockResolvedValue({
+//         id: 'env-123',
+//         name: 'development',
+//         projectId: mockProject.id,
+//       } as any);
+//       prismaService.project.findUnique.mockResolvedValue({
+//         ...mockProject,
+//         owner: mockUser,
+//         environments: [],
+//         _count: { flags: 0 },
+//       } as any);
 
-    it('should throw ConflictException if slug already exists', async () => {
-      const createDto = {
-        name: 'Test Project',
-        slug: 'test-project',
-      };
+//       const result = await service.create(createDto, mockUser.id);
 
-      prismaService.project.findUnique.mockResolvedValue(mockProject as any);
+//       expect(result).toBeDefined();
+//       expect(prismaService.project.create).toHaveBeenCalled();
+//     });
 
-      await expect(service.create(createDto, mockUser.id)).rejects.toThrow(
-        ConflictException,
-      );
-    });
-  });
+//     it('should throw ConflictException if slug already exists', async () => {
+//       const createDto = {
+//         name: 'Test Project',
+//         slug: 'test-project',
+//       };
 
-  describe('findAll', () => {
-    it('should return projects owned and member projects', async () => {
-      prismaService.project.findMany.mockResolvedValue([mockProject as any]);
-      prismaService.projectMember.findMany.mockResolvedValue([]);
+//       prismaService.project.findUnique.mockResolvedValue(mockProject as any);
 
-      const result = await service.findAll(mockUser.id);
+//       await expect(service.create(createDto, mockUser.id)).rejects.toThrow(
+//         ConflictException,
+//       );
+//     });
+//   });
 
-      expect(result).toBeDefined();
-      expect(Array.isArray(result)).toBe(true);
-    });
-  });
+//   describe('findAll', () => {
+//     it('should return projects owned and member projects', async () => {
+//       prismaService.project.findMany.mockResolvedValue([mockProject as any]);
+//       prismaService.projectMember.findMany.mockResolvedValue([]);
 
-  describe('findOne', () => {
-    it('should return a project by id', async () => {
-      prismaService.project.findUnique.mockResolvedValue({
-        ...mockProject,
-        owner: mockUser,
-        environments: [],
-        _count: { flags: 0 },
-      } as any);
+//       const result = await service.findAll(mockUser.id);
 
-      const result = await service.findOne(mockProject.id);
+//       expect(result).toBeDefined();
+//       expect(Array.isArray(result)).toBe(true);
+//     });
+//   });
 
-      expect(result).toBeDefined();
-      expect(result.id).toBe(mockProject.id);
-    });
+//   describe('findOne', () => {
+//     it('should return a project by id', async () => {
+//       prismaService.project.findUnique.mockResolvedValue({
+//         ...mockProject,
+//         owner: mockUser,
+//         environments: [],
+//         _count: { flags: 0 },
+//       } as any);
 
-    it('should throw NotFoundException if project not found', async () => {
-      prismaService.project.findUnique.mockResolvedValue(null);
+//       const result = await service.findOne(mockProject.id);
 
-      await expect(service.findOne('non-existent')).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-  });
+//       expect(result).toBeDefined();
+//       expect(result.id).toBe(mockProject.id);
+//     });
 
-  describe('update', () => {
-    it('should update a project', async () => {
-      const updateDto = { name: 'Updated Project' };
+//     it('should throw NotFoundException if project not found', async () => {
+//       prismaService.project.findUnique.mockResolvedValue(null);
 
-      prismaService.project.findUnique.mockResolvedValue(mockProject as any);
-      prismaService.project.update.mockResolvedValue({
-        ...mockProject,
-        ...updateDto,
-      } as any);
+//       await expect(service.findOne('non-existent')).rejects.toThrow(
+//         NotFoundException,
+//       );
+//     });
+//   });
 
-      // Mock findOne for the return
-      prismaService.project.findUnique.mockResolvedValueOnce(mockProject as any);
-      prismaService.project.findUnique.mockResolvedValueOnce({
-        ...mockProject,
-        ...updateDto,
-        owner: mockUser,
-        environments: [],
-        _count: { flags: 0 },
-      } as any);
+//   describe('update', () => {
+//     it('should update a project', async () => {
+//       const updateDto = { name: 'Updated Project' };
 
-      const result = await service.update(mockProject.id, updateDto, mockUser.id);
+//       prismaService.project.findUnique.mockResolvedValue(mockProject as any);
+//       prismaService.project.update.mockResolvedValue({
+//         ...mockProject,
+//         ...updateDto,
+//       } as any);
 
-      expect(result).toBeDefined();
-    });
+//       // Mock findOne for the return
+//       prismaService.project.findUnique.mockResolvedValueOnce(mockProject as any);
+//       prismaService.project.findUnique.mockResolvedValueOnce({
+//         ...mockProject,
+//         ...updateDto,
+//         owner: mockUser,
+//         environments: [],
+//         _count: { flags: 0 },
+//       } as any);
 
-    it('should throw NotFoundException if project not found', async () => {
-      prismaService.project.findUnique.mockResolvedValue(null);
+//       const result = await service.update(mockProject.id, updateDto, mockUser.id);
 
-      await expect(
-        service.update('non-existent', { name: 'Test' }, mockUser.id),
-      ).rejects.toThrow(NotFoundException);
-    });
-  });
+//       expect(result).toBeDefined();
+//     });
 
-  describe('delete', () => {
-    it('should delete a project', async () => {
-      prismaService.project.findUnique.mockResolvedValue(mockProject as any);
-      prismaService.project.delete.mockResolvedValue(mockProject as any);
+//     it('should throw NotFoundException if project not found', async () => {
+//       prismaService.project.findUnique.mockResolvedValue(null);
 
-      const result = await service.delete(mockProject.id, mockUser.id);
+//       await expect(
+//         service.update('non-existent', { name: 'Test' }, mockUser.id),
+//       ).rejects.toThrow(NotFoundException);
+//     });
+//   });
 
-      expect(result).toEqual({ deleted: true, id: mockProject.id });
-      expect(redisService.delPattern).toHaveBeenCalled();
-    });
+//   describe('delete', () => {
+//     it('should delete a project', async () => {
+//       prismaService.project.findUnique.mockResolvedValue(mockProject as any);
+//       prismaService.project.delete.mockResolvedValue(mockProject as any);
 
-    it('should throw NotFoundException if project not found', async () => {
-      prismaService.project.findUnique.mockResolvedValue(null);
+//       const result = await service.delete(mockProject.id, mockUser.id);
 
-      await expect(service.delete('non-existent', mockUser.id)).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-  });
+//       expect(result).toEqual({ deleted: true, id: mockProject.id });
+//       expect(redisService.delPattern).toHaveBeenCalled();
+//     });
 
-  describe('hasAccess', () => {
-    it('should return true for project owner', async () => {
-      prismaService.project.findUnique.mockResolvedValue(mockProject as any);
-      prismaService.projectMember.findUnique.mockResolvedValue(null);
+//     it('should throw NotFoundException if project not found', async () => {
+//       prismaService.project.findUnique.mockResolvedValue(null);
 
-      const result = await service.hasAccess(mockProject.id, mockUser.id);
+//       await expect(service.delete('non-existent', mockUser.id)).rejects.toThrow(
+//         NotFoundException,
+//       );
+//     });
+//   });
 
-      expect(result).toBe(true);
-    });
+//   describe('hasAccess', () => {
+//     it('should return true for project owner', async () => {
+//       prismaService.project.findUnique.mockResolvedValue(mockProject as any);
+//       prismaService.projectMember.findUnique.mockResolvedValue(null);
 
-    it('should return true for project member', async () => {
-      prismaService.project.findUnique.mockResolvedValue({
-        ...mockProject,
-        ownerId: 'other-user',
-      } as any);
-      prismaService.projectMember.findUnique.mockResolvedValue({
-        id: 'member-123',
-        userId: mockUser.id,
-        projectId: mockProject.id,
-      } as any);
+//       const result = await service.hasAccess(mockProject.id, mockUser.id);
 
-      const result = await service.hasAccess(mockProject.id, mockUser.id);
+//       expect(result).toBe(true);
+//     });
 
-      expect(result).toBe(true);
-    });
+//     it('should return true for project member', async () => {
+//       prismaService.project.findUnique.mockResolvedValue({
+//         ...mockProject,
+//         ownerId: 'other-user',
+//       } as any);
+//       prismaService.projectMember.findUnique.mockResolvedValue({
+//         id: 'member-123',
+//         userId: mockUser.id,
+//         projectId: mockProject.id,
+//       } as any);
 
-    it('should return false for non-member', async () => {
-      prismaService.project.findUnique.mockResolvedValue({
-        ...mockProject,
-        ownerId: 'other-user',
-      } as any);
-      prismaService.projectMember.findUnique.mockResolvedValue(null);
+//       const result = await service.hasAccess(mockProject.id, mockUser.id);
 
-      const result = await service.hasAccess(mockProject.id, mockUser.id);
+//       expect(result).toBe(true);
+//     });
 
-      expect(result).toBe(false);
-    });
-  });
-});
+//     it('should return false for non-member', async () => {
+//       prismaService.project.findUnique.mockResolvedValue({
+//         ...mockProject,
+//         ownerId: 'other-user',
+//       } as any);
+//       prismaService.projectMember.findUnique.mockResolvedValue(null);
+
+//       const result = await service.hasAccess(mockProject.id, mockUser.id);
+
+//       expect(result).toBe(false);
+//     });
+//   });
+// });

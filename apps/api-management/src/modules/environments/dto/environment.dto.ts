@@ -1,3 +1,5 @@
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { EnvironmentType } from '@prisma/client';
 import {
   IsString,
   IsOptional,
@@ -9,8 +11,6 @@ import {
   Matches,
   Min,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { EnvironmentType } from '@prisma/client';
 
 export class CreateEnvironmentDto {
   @ApiProperty({
@@ -23,7 +23,8 @@ export class CreateEnvironmentDto {
   @MinLength(2)
   @MaxLength(50)
   @Matches(/^[a-z][a-z0-9_-]*$/, {
-    message: 'Name must start with lowercase letter and contain only lowercase letters, numbers, hyphens, and underscores',
+    message:
+      'Name must start with lowercase letter and contain only lowercase letters, numbers, hyphens, and underscores',
   })
   name: string;
 
@@ -110,7 +111,9 @@ export class EnvironmentResponseDto {
 }
 
 export class EnvironmentWithApiKeyDto extends EnvironmentResponseDto {
-  @ApiProperty({ description: 'API key (only shown once on creation or rotation)' })
+  @ApiProperty({
+    description: 'API key (only shown once on creation or rotation)',
+  })
   apiKey: string;
 }
 
@@ -123,7 +126,9 @@ export class EnvironmentWithStatsDto extends EnvironmentResponseDto {
 }
 
 export class RotateApiKeyResponseDto {
-  @ApiProperty({ description: 'New API key (save it securely, shown only once)' })
+  @ApiProperty({
+    description: 'New API key (save it securely, shown only once)',
+  })
   apiKey: string;
 
   @ApiProperty({ description: 'Message' })

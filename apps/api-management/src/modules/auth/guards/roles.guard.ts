@@ -9,8 +9,8 @@ import { Reflector } from '@nestjs/core';
 import { ProjectRole } from '@prisma/client';
 
 import { ROLES_KEY } from '../../../common/decorators/roles.decorator';
-import { AuthenticatedUser } from '../auth.service';
 import { PrismaService } from '../../database/prisma.service';
+import { AuthenticatedUser } from '../auth.service';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -41,9 +41,7 @@ export class RolesGuard implements CanActivate {
 
     // Get project ID from request params or body
     const projectId =
-      request.params.projectId ||
-      request.params.id ||
-      request.body?.projectId;
+      request.params.projectId || request.params.id || request.body?.projectId;
 
     if (!projectId) {
       throw new ForbiddenException('Project ID is required');

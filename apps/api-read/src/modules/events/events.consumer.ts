@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await */
 // apps/api-read/src/modules/events/events.consumer.ts
 // Consumer d'événements pour invalidation de cache
 //
@@ -33,6 +34,7 @@ import {
   SQSClient,
   ReceiveMessageCommand,
   DeleteMessageCommand,
+  // eslint-disable-next-line import/named
   Message,
 } from '@aws-sdk/client-sqs';
 import {

@@ -12,10 +12,11 @@ export class HealthService {
     private readonly cache: CacheService,
   ) {}
 
-  async check() {
+  check() {
     return {
       status: 'ok',
       service: 'api-read',
+      // eslint-disable-next-line turbo/no-undeclared-env-vars
       version: process.env.npm_package_version || '1.0.0',
       timestamp: new Date().toISOString(),
       uptime: Math.floor((Date.now() - this.startTime) / 1000),

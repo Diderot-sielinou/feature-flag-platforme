@@ -122,7 +122,7 @@ export class ComputeStack extends cdk.Stack {
       targetType: elbv2.TargetType.IP,
       targetGroupName: 'ff-read-tg',
       healthCheck: {
-        path: '/api/v1/eval/health',
+        path: '/api/v1/sse/health',
         interval: cdk.Duration.seconds(60),
         timeout: cdk.Duration.seconds(10),
         healthyThresholdCount: 2,

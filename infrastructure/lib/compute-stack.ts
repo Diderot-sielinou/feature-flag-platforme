@@ -390,7 +390,7 @@ export class ComputeStack extends cdk.Stack {
     // Environment Variables
     // ========================================
     const commonEnv = {
-      NODE_ENV: isProduction ? 'production' : 'development',
+      NODE_ENV: isProduction ? 'production' : 'production',
       AWS_REGION: cdk.Aws.REGION,
       REDIS_HOST: props.redisEndpoint,
       REDIS_PORT: '6379',

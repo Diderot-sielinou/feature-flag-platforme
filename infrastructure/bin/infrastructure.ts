@@ -34,8 +34,7 @@ const config = {
   // Email pour les alertes et SES
   alarmEmail: process.env.ALARM_EMAIL || 'diderotsielinou@gmail.com',
 
-  // Mode production ou développement (affecte les ressources)
-  isProduction: true,
+  isProduction: process.env.NODE_ENV === 'production',
   dashboardUrl: 'http://localhost:3000',
 
   // Domaine (optionnel - à configurer plus tard)

@@ -33,7 +33,11 @@ jobs:
       - name: Generate Prisma Client
         run: npm run db:generate
 
-      - name: Build packages (nécessaire pour le monorepo)
+      - name: Build shared packages first
+        run: |
+          npx turbo run build --filter=@repo/shared --filter=@repo/database --filter=@repo/sdk
+
+      - name: Build all packages
         run: npm run build
 
       - name: Lint
@@ -86,14 +90,18 @@ jobs:
       - name: Generate Prisma Client
         run: npm run db:generate
 
-      - name: Build packages
+      - name: Build shared packages first
+        run: |
+          npx turbo run build --filter=@repo/shared --filter=@repo/database --filter=@repo/sdk
+
+      - name: Build all packages
         run: npm run build
 
       - name: Run migrations
         run: npm run db:migrate:dev
 
-      #- name: Run tests
-      #  run: npm test -- --coverage
+      # - name: Run tests
+      #   run: npm test -- --coverage
 
       - name: Upload coverage
         if: success()
@@ -124,6 +132,10 @@ jobs:
 
       - name: Generate Prisma Client
         run: npm run db:generate
+
+      - name: Build shared packages first
+        run: |
+          npx turbo run build --filter=@repo/shared --filter=@repo/database --filter=@repo/sdk
 
       - name: Build all packages
         run: npm run build

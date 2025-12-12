@@ -46,6 +46,7 @@
     },
 
     "lint": {
+      "dependsOn": ["^build"],
       "outputs": []
     },
 
@@ -64,6 +65,12 @@
       "cache": false,
       "dependsOn": [],
       "env": ["CDK_DEFAULT_ACCOUNT", "CDK_DEFAULT_REGION", "AWS_PROFILE"]
+    },
+    "db:generate": {
+      "cache": false
+    },
+    "db:migrate:dev": {
+      "cache": false
     }
   }
 }

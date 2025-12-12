@@ -88,7 +88,7 @@ export class EventsConsumer implements OnModuleInit, OnModuleDestroy {
       this.configService.get<number>('messaging.sqsPollingInterval') || 1000;
   }
 
-  async onModuleInit() {
+  onModuleInit() {
     if (this.isProduction && this.sqsQueueUrl) {
       // Production: Utiliser SQS
       const region =
@@ -105,7 +105,7 @@ export class EventsConsumer implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async onModuleDestroy() {
+  onModuleDestroy() {
     this.sqsPollingActive = false;
     this.sqsClient?.destroy();
   }

@@ -29,7 +29,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "build/**", ".turbo/**"],
+      "outputs": ["dist/**", ".next/**", "build/**", ".turbo/**", ".tsbuildinfo"],
       "env": ["NODE_ENV"],
       "cache": true
     },

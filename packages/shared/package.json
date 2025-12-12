@@ -31,9 +31,9 @@
     "dist"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsc",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "build": "npm run clean && tsc",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src --fix",
     "type-check": "tsc --noEmit"

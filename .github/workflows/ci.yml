@@ -107,6 +107,11 @@ jobs:
       - name: Generate Prisma Client
         run: npm run db:generate
 
+      - name: Clean build artifacts
+        run: |
+          find . -name "tsconfig.tsbuildinfo" -type f -delete
+          find . -type d -name "dist" -not -path "*/node_modules/*" -exec rm -rf {} + 2>/dev/null || true
+
       - name: Build shared packages first
         run: |
           npx turbo run build --filter=@repo/shared --filter=@repo/database --filter=@repo/sdk

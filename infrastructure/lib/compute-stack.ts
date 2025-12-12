@@ -394,6 +394,7 @@ export class ComputeStack extends cdk.Stack {
       AWS_REGION: cdk.Aws.REGION,
       REDIS_HOST: props.redisEndpoint,
       REDIS_PORT: '6379',
+      REDIS_TLS: isProduction ? 'true' : 'false',
       COGNITO_USER_POOL_ID: props.userPoolId,
       COGNITO_CLIENT_ID: props.userPoolClientId,
       EVENT_BUS_NAME: props.eventBusName,

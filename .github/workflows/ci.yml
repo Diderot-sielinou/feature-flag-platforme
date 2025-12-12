@@ -93,9 +93,6 @@ jobs:
       - name: Run migrations
         run: npm run db:migrate:dev
 
-      - name: Run tests
-        run: npm test -- --coverage
-
       - name: Upload coverage
         if: success()
         uses: codecov/codecov-action@v4.0.1

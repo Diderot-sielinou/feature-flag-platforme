@@ -5,8 +5,8 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "baseUrl": "./",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "CommonJS", // ✅ Changez de NodeNext à CommonJS
+    "moduleResolution": "Node", // ✅ Changez de NodeNext à Node
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "useDefineForClassFields": false,
@@ -14,7 +14,6 @@
       "@/*": ["src/*"]
     }
   },
-  // ✅ CORRECTION : Ne pas inclure test/ dans la compilation principale
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "test"],
   "references": [

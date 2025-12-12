@@ -5,28 +5,36 @@
     "lib": ["ES2022"],
     "module": "CommonJS",
     "moduleResolution": "Node",
+
+    // Output configuration
     "outDir": "./dist",
     "rootDir": "./src",
 
-    // ✅ CRITIQUE : Générer les fichiers .d.ts
+    // Generate type definitions
     "declaration": true,
     "declarationMap": true,
-
     "sourceMap": true,
-    "removeComments": true,
-    "emitDeclarationOnly": false,
 
+    // Don't emit comments
+    "removeComments": false,
+    "emitDecoratorMetadata": false,
+    "experimentalDecorators": false,
+
+    // Module interop
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "isolatedModules": true,
 
+    // Strict checks
     "strict": true,
     "skipLibCheck": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
 
-    // ✅ Activer composite pour project references
-    "composite": true
+    // Project references
+    "composite": true,
+    "incremental": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts"]

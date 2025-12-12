@@ -15,6 +15,7 @@ jobs:
   # ===========================================================================
   # LINT & TYPE CHECK
   # ===========================================================================
+
   lint:
     name: Lint & Type Check
     runs-on: ubuntu-latest
@@ -33,9 +34,25 @@ jobs:
       - name: Generate Prisma Client
         run: npm run db:generate
 
-      - name: Build shared packages first
+      - name: Build shared packages in order
         run: |
-          npx turbo run build --filter=@repo/shared --filter=@repo/database --filter=@repo/sdk
+          echo "📦 Building @repo/shared..."
+          npx turbo run build --filter=@repo/shared --force
+
+           echo "📦 Building @repo/database..."
+          npx turbo run build --filter=@repo/database --force
+
+          echo "📦 Building @repo/sdk..."
+          npx turbo run build --filter=@repo/sdk --force
+
+      - name: Verify outputs exist
+        run: |
+          echo "🔍 Verifying build outputs..."
+          test -f packages/shared/dist/index.js || (echo "❌ @repo/shared build failed" && exit 1)
+          test -f packages/shared/dist/index.d.ts || (echo "❌ @repo/shared types missing" && exit 1)
+          test -f packages/database/dist/index.js || (echo "❌ @repo/database build failed" && exit 1)
+          test -f packages/database/dist/index.d.ts || (echo "❌ @repo/database types missing" && exit 1)
+          echo "✅ All shared packages built successfully"
 
       - name: Build all packages
         run: npm run build
@@ -136,6 +153,16 @@ jobs:
       - name: Build shared packages first
         run: |
           npx turbo run build --filter=@repo/shared --filter=@repo/database --filter=@repo/sdk
+
+      - name: Verify shared packages outputs
+        run: |
+          echo "🔍 Checking if dist folders exist..."
+          ls -la packages/shared/ || echo "⚠️  shared package not found"
+          ls -la packages/shared/dist/ || echo "❌ shared/dist not found"
+          ls -la packages/database/ || echo "⚠️  database package not found"
+          ls -la packages/database/dist/ || echo "❌ database/dist not found"
+          ls -la packages/sdk/ || echo "⚠️  sdk package not found"
+          ls -la packages/sdk/dist/ || echo "❌ sdk/dist not found"
 
       - name: Build all packages
         run: npm run build

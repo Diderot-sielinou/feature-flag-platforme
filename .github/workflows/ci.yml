@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.1.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v4.0.2
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -69,10 +69,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.1.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v4.0.2
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -88,11 +88,16 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/featureflags_test
 
+      #- name: Run tests
+      #  run: npm test
       - name: Upload coverage
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4.0.1
         with:
           files: ./coverage/lcov.info
           fail_ci_if_error: false
+        # Optionnel : ajouter un token si vous avez un compte Codecov
+        # env:
+        #   CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   # ===========================================================================
   # BUILD
@@ -103,10 +108,10 @@ jobs:
     needs: [lint]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.1.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v4.0.2
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -119,3 +124,13 @@ jobs:
 
       - name: Build all packages
         run: npm run build
+
+      - name: Verify builds
+        run: |
+          echo "✅ Checking build outputs..."
+          test -f apps/api-management/dist/main.js || exit 1
+          test -f apps/api-read/dist/main.js || exit 1
+          test -f packages/shared/dist/index.js || exit 1
+          test -f packages/shared/dist/index.d.ts || exit 1
+          test -f packages/database/dist/index.js || exit 1
+          echo "✅ All builds successful!"

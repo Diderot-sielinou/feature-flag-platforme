@@ -8,6 +8,9 @@ on:
 
 env:
   NODE_VERSION: '20'
+  # Désactive Husky dans CI
+  HUSKY: '0'
+  CI: 'true'
 
 jobs:
   # ===========================================================================
@@ -24,23 +27,12 @@ jobs:
         uses: actions/setup-node@v4.0.2
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-        # Ajout de la gestion d'erreur pour le cache
-        continue-on-error: true
+          # Pas de cache pour éviter l'erreur 400
 
-      - name: Cache node modules (fallback)
-        if: steps.setup-node.outcome == 'failure'
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Clean install
-        run: |
-          npm cache clean --force
-          npm ci --prefer-offline --no-audit
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+        env:
+          HUSKY: 0
 
       - name: Generate Prisma Client
         run: npm run db:generate
@@ -79,6 +71,7 @@ jobs:
       REDIS_PORT: 6379
       JWT_SECRET: test-secret-for-ci
       NODE_ENV: test
+      HUSKY: 0
 
     steps:
       - name: Checkout
@@ -88,44 +81,28 @@ jobs:
         uses: actions/setup-node@v4.0.2
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-        continue-on-error: true
 
-      - name: Cache node modules (fallback)
-        if: steps.setup-node.outcome == 'failure'
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Clean install
-        run: |
-          npm cache clean --force
-          npm ci --prefer-offline --no-audit
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+        env:
+          HUSKY: 0
 
       - name: Generate Prisma Client
         run: npm run db:generate
 
       - name: Run migrations
         run: npm run db:migrate:dev
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/featureflags_test
 
       - name: Run tests
         run: npm test -- --coverage
-        continue-on-error: true
 
       - name: Upload coverage
-        if: always()
+        if: success()
         uses: codecov/codecov-action@v4.0.1
         with:
           files: ./coverage/lcov.info
           fail_ci_if_error: false
-        # Optionnel : ajouter un token si vous avez un compte Codecov
-        # env:
-        #   CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
 
   # ===========================================================================
   # BUILD
@@ -142,22 +119,11 @@ jobs:
         uses: actions/setup-node@v4.0.2
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-        continue-on-error: true
 
-      - name: Cache node modules (fallback)
-        if: steps.setup-node.outcome == 'failure'
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Clean install
-        run: |
-          npm cache clean --force
-          npm ci --prefer-offline --no-audit
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+        env:
+          HUSKY: 0
 
       - name: Generate Prisma Client
         run: npm run db:generate

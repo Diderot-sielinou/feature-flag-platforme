@@ -1,12 +1,9 @@
 import { baseConfig } from '@repo/eslint-config/base';
 
-/**
- * Configuration ESLint pour le package database
- * Prisma schema et migrations
- */
 export default [
   ...baseConfig,
   {
+    files: ['src/**/*.ts'],
     languageOptions: {
       parserOptions: {
         project: './tsconfig.json',
@@ -17,19 +14,27 @@ export default [
   {
     files: ['src/**/*.ts'],
     rules: {
-      // Prisma génère du code, donc plus souple
       '@typescript-eslint/no-explicit-any': 'warn',
     },
   },
-
   {
     rules: {
       'no-console': 'off',
     },
   },
-
   {
-    // Ignorer les fichiers générés par Prisma
-    ignores: ['prisma/migrations/**', 'node_modules/@prisma/**'],
+    // Consolidation de toutes les directives 'ignores'
+    ignores: [
+      'infrastructure/**',
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/*.js',
+      '**/*.d.ts',
+      'src/**/*.js',
+      'src/**/*.d.ts',
+      'prisma/migrations/**',
+      'node_modules/@prisma/**',
+      'prisma/**',
+    ],
   },
 ];

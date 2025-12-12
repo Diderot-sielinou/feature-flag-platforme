@@ -39,6 +39,8 @@ export interface ComputeStackProps extends cdk.StackProps {
 
   // Configuration
   isProduction?: boolean;
+  dashboardUrl?: string;
+  // docsUrl?: string;
 }
 
 /**
@@ -400,6 +402,10 @@ export class ComputeStack extends cdk.Stack {
       // SES Configuration
       SES_SENDER_EMAIL: props.senderEmail,
       SES_CONFIGURATION_SET: 'feature-flags-emails',
+
+      // App URLs (pour les liens dans les emails) - AJOUTER
+      DASHBOARD_URL: props.dashboardUrl || `http://${this.alb.loadBalancerDnsName}`,
+      // DOCS_URL: props.docsUrl || `http://${this.alb.loadBalancerDnsName}/docs`,
     };
 
     const managementEnv = {
@@ -467,7 +473,7 @@ export class ComputeStack extends cdk.Stack {
       },
       portMappings: [{ containerPort: 3001, protocol: ecs.Protocol.TCP }],
       healthCheck: {
-        command: ['CMD-SHELL', 'curl -f http://localhost:3001/api/v1/eval/health || exit 1'],
+        command: ['CMD-SHELL', 'curl -f http://localhost:3001/api/v1/sse/health || exit 1'],
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(5),
         retries: 3,

@@ -29,9 +29,9 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "build/**"],
-
-      "env": ["NODE_ENV"]
+      "outputs": ["dist/**", ".next/**", "build/**", ".turbo/**", ".tsbuildinfo"],
+      "env": ["NODE_ENV"],
+      "cache": true
     },
 
     "dev": {
@@ -46,6 +46,7 @@
     },
 
     "lint": {
+      "dependsOn": ["^build"],
       "outputs": []
     },
 
@@ -64,6 +65,15 @@
       "cache": false,
       "dependsOn": [],
       "env": ["CDK_DEFAULT_ACCOUNT", "CDK_DEFAULT_REGION", "AWS_PROFILE"]
+    },
+
+    "db:generate": {
+      "cache": false,
+      "outputs": ["node_modules/.prisma/**", "prisma/client/**"]
+    },
+
+    "db:migrate:dev": {
+      "cache": false
     }
   }
 }

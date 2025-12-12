@@ -1,14 +1,40 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "@repo/typescript-config/base.json",
   "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+
+    // Output configuration
     "outDir": "./dist",
     "rootDir": "./src",
-    "composite": true,
+
+    // Generate type definitions
     "declaration": true,
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "declarationMap": true
+    "declarationMap": true,
+    "sourceMap": true,
+
+    // Don't emit comments
+    "removeComments": false,
+    "emitDecoratorMetadata": false,
+    "experimentalDecorators": false,
+
+    // Module interop
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+
+    // Strict checks
+    "strict": true,
+    "skipLibCheck": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+
+    // Project references
+    "composite": true,
+    "incremental": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts"]

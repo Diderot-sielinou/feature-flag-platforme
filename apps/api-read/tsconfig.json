@@ -5,20 +5,19 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "baseUrl": "./",
-
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-
+    "module": "CommonJS", // ✅ Changez de NodeNext à CommonJS
+    "moduleResolution": "Node", // ✅ Changez de NodeNext à Node
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "useDefineForClassFields": false,
-
     "paths": {
-      "@/*": ["src/*"],
-      "@repo/shared": ["../../packages/shared/src"],
-      "@repo/database": ["../../packages/database/src"]
+      "@/*": ["src/*"]
     }
   },
-  "include": ["src/**/*", "test/**/*", "**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "test"],
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/database" }
+  ]
 }

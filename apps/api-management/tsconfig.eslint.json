@@ -1,5 +1,10 @@
-// apps/api-management/tsconfig.eslint.json (Vérification)
 {
-  "extends": "./tsconfig.json", // Hérite d'un fichier qui inclut désormais les tests
-  "include": ["src/**/*", "test/**/*", "**/*.ts"]
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Permet à ESLint d'utiliser les fichiers de test
+    "rootDir": "./"
+  },
+  "include": ["src/**/*", "test/**/*", "**/*.ts"],
+  // Surcharge l'exclusion du dossier 'test' héritée de tsconfig.json
+  "exclude": ["node_modules", "dist"]
 }

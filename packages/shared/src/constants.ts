@@ -146,9 +146,9 @@ export const LIMITS = {
 export const DEFAULTS = {
   // Default environments created with new project
   PROJECT_ENVIRONMENTS: [
-    { name: 'development', type: 'development', color: '#6366F1', sortOrder: 0 },
-    { name: 'staging', type: 'staging', color: '#F59E0B', sortOrder: 1 },
-    { name: 'production', type: 'production', color: '#10B981', sortOrder: 2 },
+    { name: 'development', type: 'DEVELOPMENT', color: '#6366F1', sortOrder: 0 },
+    { name: 'staging', type: 'STAGING', color: '#F59E0B', sortOrder: 1 },
+    { name: 'production', type: 'PRODUCTION', color: '#10B981', sortOrder: 2 },
   ] as const,
 
   // Default rule set

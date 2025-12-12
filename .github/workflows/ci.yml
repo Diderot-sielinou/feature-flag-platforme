@@ -26,10 +26,9 @@ jobs:
         uses: actions/setup-node@v4.0.2
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # Pas de cache pour éviter l'erreur 400
 
       - name: Install dependencies
-        run: npm Install --prefer-offline --no-audit
+        run: npm install --prefer-offline --no-audit
 
       - name: Generate Prisma Client
         run: npm run db:generate
@@ -79,13 +78,16 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install dependencies
-        run: npm Install --prefer-offline --no-audit
+        run: npm install --prefer-offline --no-audit
 
       - name: Generate Prisma Client
         run: npm run db:generate
 
       - name: Run migrations
         run: npm run db:migrate:dev
+
+      - name: Run tests
+        run: npm test -- --coverage
 
       - name: Upload coverage
         if: success()
@@ -112,7 +114,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install dependencies
-        run: npm Install --prefer-offline --no-audit
+        run: npm install --prefer-offline --no-audit
 
       - name: Generate Prisma Client
         run: npm run db:generate

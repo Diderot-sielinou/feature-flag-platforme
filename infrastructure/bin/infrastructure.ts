@@ -35,7 +35,7 @@ const config = {
   alarmEmail: process.env.ALARM_EMAIL || 'diderotsielinou@gmail.com',
 
   // Mode production ou développement (affecte les ressources)
-  isProduction: process.env.NODE_ENV === 'production',
+  isProduction: true,
   dashboardUrl: 'http://localhost:3000',
 
   // Domaine (optionnel - à configurer plus tard)
@@ -140,7 +140,7 @@ const computeStack = new ComputeStack(app, 'FeatureFlagsComputeStack', {
 
   // App URLs (à configurer quand vous aurez un domaine)
   dashboardUrl: config.dashboardUrl ? `https://app.${config.domainName}` : undefined,
-  // docsUrl: config.domainName ? `https://docs.${config.domainName}` : undefined, 
+  // docsUrl: config.domainName ? `https://docs.${config.domainName}` : undefined,
 
   // Configuration
   isProduction: config.isProduction,

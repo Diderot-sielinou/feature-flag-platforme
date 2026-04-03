@@ -69,13 +69,13 @@ export default () => ({
   // Variables ECS: SES_SENDER_EMAIL, SES_CONFIGURATION_SET
   // ==========================================================================
   email: {
-    // En prod, les emails sont toujours actifs
-    // En dev, on peut les désactiver explicitement
     enabled: process.env.NODE_ENV === 'production' || process.env.EMAIL_ENABLED === 'true',
-    senderEmail: process.env.SES_SENDER_EMAIL || 'noreply@launchlayer.io',
-    senderName: process.env.SES_SENDER_NAME || 'LaunchLayer',
+    provider: process.env.EMAIL_PROVIDER || 'resend', // 'resend' | 'ses'
+    resendApiKey: process.env.RESEND_API_KEY,
+    senderEmail: process.env.EMAIL_FROM || process.env.SES_SENDER_EMAIL || 'noreply@launchlayer.io',
+    senderName: process.env.EMAIL_SENDER_NAME || process.env.SES_SENDER_NAME || 'LaunchLayer',
     configurationSet: process.env.SES_CONFIGURATION_SET || 'feature-flags-emails',
-    replyToEmail: process.env.SES_REPLY_TO_EMAIL,
+    replyToEmail: process.env.EMAIL_REPLY_TO || process.env.SES_REPLY_TO_EMAIL,
   },
 
   // ==========================================================================
@@ -158,6 +158,8 @@ export interface AppConfig {
   };
   email: {
     enabled: boolean;
+    provider: string;
+    resendApiKey?: string;
     senderEmail: string;
     senderName: string;
     configurationSet: string;

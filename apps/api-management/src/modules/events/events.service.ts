@@ -46,7 +46,6 @@ export interface MemberInvitedPayload {
   inviterEmail: string;
   expiresAt: Date;
   isNewUser: boolean;
-  temporaryPassword?: string;
   isResend?: boolean;
   [key: string]: unknown;
 }
@@ -221,7 +220,6 @@ export class EventsService implements OnModuleInit {
       token: payload.token,
       recipientEmail: payload.email,
       isNewUser: payload.isNewUser,
-      temporaryPassword: payload.temporaryPassword,
     });
 
     if (!emailSent) {

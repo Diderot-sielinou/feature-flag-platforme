@@ -307,7 +307,7 @@ export class MembersService {
    * 1. Validate project exists and role is valid
    * 2. Check if user exists in DB
    *    - If exists: verify not already owner/member
-   *    - If not exists: create in Cognito + DB
+   *    - If not exists: create placeholder in DB
    * 3. Create Invitation record with token
    * 4. Emit event for email notification
    */
@@ -357,7 +357,6 @@ export class MembersService {
     });
 
     let isNewUser = false;
-    let temporaryPassword: string | undefined;
 
     if (targetUser) {
       // User exists - check if already owner
@@ -382,31 +381,25 @@ export class MembersService {
       }
     } else {
       // =====================================================================
-      // User doesn't exist - Create in Cognito + DB
+      // User doesn't exist - Create placeholder in DB
+      // User will set up their auth account (Clerk) when accepting invitation.
       // =====================================================================
       isNewUser = true;
 
       try {
-        // Create user in Cognito (returns cognitoId and temp password)
-        const cognitoResult = await this.authService.createCognitoUser(
-          normalizedEmail,
-        );
+        const result = await this.authService.createInvitedUser(normalizedEmail);
 
-        temporaryPassword = cognitoResult.temporaryPassword;
-
-        // Create user in database with PENDING_VERIFICATION status
-        targetUser = await this.prisma.user.create({
-          data: {
-            cognitoId: cognitoResult.cognitoId,
-            email: normalizedEmail,
-            status: UserStatus.PENDING_VERIFICATION,
-            emailVerified: false,
-          },
+        targetUser = await this.prisma.user.findUnique({
+          where: { email: normalizedEmail },
           select: { id: true, email: true, status: true },
         });
 
+        if (!targetUser) {
+          throw new Error('User creation failed unexpectedly');
+        }
+
         this.logger.log(
-          `Created new user for invitation: ${normalizedEmail} (cognitoId: ${cognitoResult.cognitoId})`,
+          `Created new user for invitation: ${normalizedEmail} (externalId: ${result.externalId})`,
         );
       } catch (error) {
         this.logger.error(
@@ -477,7 +470,6 @@ export class MembersService {
       inviterEmail: sender.email,
       expiresAt,
       isNewUser,
-      temporaryPassword, // Only set for new users
     });
 
     this.logger.log(

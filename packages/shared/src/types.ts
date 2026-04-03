@@ -211,7 +211,7 @@ export interface Timestamps {
 
 export interface User extends Timestamps {
   id: string;
-  cognitoId: string;
+  externalId: string;
   email: string;
   firstName?: string;
   lastName?: string;

@@ -38,7 +38,7 @@ async function main() {
     where: { email: 'admin@launchlayer.io' },
     update: {},
     create: {
-      cognitoId: 'cognito-admin-001',
+      externalId: 'seed_admin_001',
       email: 'admin@launchlayer.io',
       firstName: 'Admin',
       lastName: 'User',
@@ -62,7 +62,7 @@ async function main() {
     where: { email: 'dev@launchlayer.io' },
     update: {},
     create: {
-      cognitoId: 'cognito-dev-001',
+      externalId: 'seed_dev_001',
       email: 'dev@launchlayer.io',
       firstName: 'Developer',
       lastName: 'User',

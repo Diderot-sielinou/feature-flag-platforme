@@ -193,7 +193,7 @@ export class MembersController {
     summary: 'Invite a new member to the project',
     description: `
       Sends an invitation to join the project. 
-      - If the user doesn't exist, creates account in Cognito and DB
+      - If the user doesn't exist, creates a placeholder account in DB
       - Generates invitation token (72h expiry)
       - Triggers email notification via EventBridge
     `,

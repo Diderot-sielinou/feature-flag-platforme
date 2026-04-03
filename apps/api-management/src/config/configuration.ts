@@ -44,13 +44,14 @@ export default () => ({
   },
 
   // ==========================================================================
-  // AWS Cognito (Authentication)
-  // Variables ECS: COGNITO_USER_POOL_ID, COGNITO_CLIENT_ID
+  // Clerk (Authentication)
   // ==========================================================================
-  cognito: {
-    userPoolId: process.env.COGNITO_USER_POOL_ID,
-    clientId: process.env.COGNITO_CLIENT_ID,
-    region: process.env.AWS_REGION || 'us-east-1',
+  clerk: {
+    secretKey: process.env.CLERK_SECRET_KEY,
+    publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+    webhookSecret: process.env.CLERK_WEBHOOK_SECRET,
+    // Issuer URL: https://<your-clerk-instance>.clerk.accounts.dev
+    issuer: process.env.CLERK_ISSUER_URL,
   },
 
   // ==========================================================================
@@ -90,7 +91,7 @@ export default () => ({
   },
 
   // ==========================================================================
-  // JWT (pour développement local sans Cognito)
+  // JWT (pour développement local sans Clerk)
   // ==========================================================================
   jwt: {
     secret: process.env.JWT_SECRET || 'dev-secret-change-in-production',
@@ -144,10 +145,11 @@ export interface AppConfig {
   aws: {
     region: string;
   };
-  cognito: {
-    userPoolId?: string;
-    clientId?: string;
-    region: string;
+  clerk: {
+    secretKey?: string;
+    publishableKey?: string;
+    webhookSecret?: string;
+    issuer?: string;
   };
   messaging: {
     eventBusName: string;

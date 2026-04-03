@@ -185,7 +185,7 @@ enum WebhookStatus {
 
 model User {
   id            String     @id @default(cuid())
-  cognitoId     String     @unique
+  externalId    String     @unique // Clerk userId (or Cognito sub for AWS mode)
   email         String     @unique
 
   name       String?
@@ -216,7 +216,7 @@ model User {
   flags          Flag[]          @relation("FlagOwner")
 
   @@index([email])
-  @@index([cognitoId])
+  @@index([externalId])
   @@index([status])
   @@map("users")
 }

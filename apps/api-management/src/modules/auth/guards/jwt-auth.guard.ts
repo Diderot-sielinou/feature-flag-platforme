@@ -8,12 +8,10 @@ import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 
 import { IS_PUBLIC_KEY } from '../../../common/decorators/public.decorator';
-import { AuthenticatedUser } from '../auth.service'; 
-
-
+import { AuthenticatedUser } from '../auth.service';
 
 @Injectable()
-export class JwtAuthGuard extends AuthGuard(['cognito', 'jwt']) {
+export class JwtAuthGuard extends AuthGuard(['clerk', 'jwt']) {
   private readonly logger = new Logger(JwtAuthGuard.name);
 
   constructor(private reflector: Reflector) {
@@ -21,7 +19,6 @@ export class JwtAuthGuard extends AuthGuard(['cognito', 'jwt']) {
   }
 
   canActivate(context: ExecutionContext) {
-    // Check if route is marked as public
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -34,12 +31,11 @@ export class JwtAuthGuard extends AuthGuard(['cognito', 'jwt']) {
     return super.canActivate(context);
   }
 
- handleRequest<TUser = AuthenticatedUser>(
+  handleRequest<TUser = AuthenticatedUser>(
     err: Error | null,
     user: TUser | false,
     info: Error | null,
   ): TUser {
-    // Handle authentication errors
     if (err) {
       this.logger.error('Authentication error:', err.message);
       throw err;

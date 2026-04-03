@@ -14,14 +14,14 @@
 //   const mockUser = {
 //     id: 'user-123',
 //     email: 'test@example.com',
-//     cognitoId: 'cognito-123',
+//     externalId: 'clerk-123',
 //     name: 'Test User',
 //     createdAt: new Date(),
 //     updatedAt: new Date(),
 //   };
 
 //   const mockCognitoPayload = {
-//     sub: 'cognito-123',
+//     sub: 'clerk-123',
 //     email: 'test@example.com',
 //     email_verified: true,
 //     name: 'Test User',
@@ -39,10 +39,10 @@
 //     const mockConfigService = {
 //       get: jest.fn((key: string) => {
 //         const config: Record<string, string> = {
-//           'cognito.userPoolId': 'us-east-1_testpool',
-//           'cognito.clientId': 'test-client-id',
-//           'cognito.region': 'us-east-1',
-//           'cognito.issuer': 'https://cognito-idp.us-east-1.amazonaws.com/us-east-1_testpool',
+//           'clerk.userPoolId': 'us-east-1_testpool',
+//           'clerk.clientId': 'test-client-id',
+//           'clerk.region': 'us-east-1',
+//           'clerk.issuer': 'https://clerk-idp.us-east-1.amazonaws.com/us-east-1_testpool',
 //         };
 //         return config[key];
 //       }),
@@ -73,7 +73,7 @@
 
 //       expect(result).toEqual(mockUser);
 //       expect(prismaService.user.findUnique).toHaveBeenCalledWith({
-//         where: { cognitoId: mockCognitoPayload.sub },
+//         where: { externalId: mockCognitoPayload.sub },
 //       });
 //     });
 
@@ -133,10 +133,10 @@
 //   });
 
 //   describe('getUserByCognitoId', () => {
-//     it('should return user by cognito id', async () => {
+//     it('should return user by clerk id', async () => {
 //       prismaService.user.findUnique.mockResolvedValue(mockUser as any);
 
-//       const result = await service.getUserByCognitoId(mockUser.cognitoId);
+//       const result = await service.getUserByCognitoId(mockUser.externalId);
 
 //       expect(result).toEqual(mockUser);
 //     });

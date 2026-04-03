@@ -1,5 +1,4 @@
-export { default as apiClient, endpoints } from './api-client';
-export { configureAmplify, isAmplifyConfigured } from './amplify-config';
+export { default as apiClient, endpoints, setAuthToken } from './api-client';
 export { projectsApi } from './projects';
 export { flagsApi } from './flags';
 export { segmentsService } from './segments';

@@ -21,7 +21,7 @@
 //     id: 'user-123',
 //     email: 'test@example.com',
 //     name: 'Test User',
-//     cognitoId: 'cognito-123',
+//     externalId: 'clerk-123',
 //   };
 
 //   const mockProject = {

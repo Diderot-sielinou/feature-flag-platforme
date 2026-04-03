@@ -1,12 +1,8 @@
 // src/modules/events/events.service.ts
-// Service de publication d'événements (EventBridge en prod, Redis en dev)
-// Aligné avec les variables d'environnement du compute-stack.ts CDK
+// Service de publication d'événements
+// MESSAGING_PROVIDER=redis → Redis Pub/Sub (VPS/dev)
+// MESSAGING_PROVIDER=aws   → EventBridge + SNS (AWS)
 
-import {
-  EventBridgeClient,
-  PutEventsCommand,
-} from '@aws-sdk/client-eventbridge';
-import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ProjectRole } from '@prisma/client';
@@ -77,13 +73,15 @@ type EventPayload = Record<string, unknown>;
 export class EventsService implements OnModuleInit {
   private readonly logger = new Logger(EventsService.name);
 
-  // Clients AWS (initialisés en prod uniquement)
-  private eventBridgeClient: EventBridgeClient | null = null;
-  private snsClient: SNSClient | null = null;
+  // Clients AWS (initialisés uniquement si MESSAGING_PROVIDER=aws)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private eventBridgeClient: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private snsClient: any = null;
 
   // Configuration (lue depuis les variables d'environnement ECS)
-  // Variables: EVENT_BUS_NAME, FLAG_TOPIC_ARN, AWS_REGION, NODE_ENV
-  private readonly isProduction: boolean;
+  // Variables: MESSAGING_PROVIDER, EVENT_BUS_NAME, FLAG_TOPIC_ARN, AWS_REGION
+  private readonly useAws: boolean;
   private readonly region: string;
   private readonly eventBusName: string;
   private readonly flagTopicArn: string | undefined;
@@ -94,8 +92,8 @@ export class EventsService implements OnModuleInit {
     private readonly emailService: EmailService,
   ) {
     // Lecture des variables d'environnement via ConfigService
-    this.isProduction =
-      this.configService.get<string>('nodeEnv') === 'production';
+    this.useAws =
+      this.configService.get<string>('messaging.provider') === 'aws';
     this.region = this.configService.get<string>('aws.region') || 'us-east-1';
     this.eventBusName =
       this.configService.get<string>('messaging.eventBusName') ||
@@ -105,12 +103,18 @@ export class EventsService implements OnModuleInit {
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async onModuleInit(): Promise<void> {
-    if (this.isProduction) {
+    if (this.useAws) {
       try {
-        // Initialisation des clients AWS en production
-        this.eventBridgeClient = new EventBridgeClient({ region: this.region });
+        // Dynamic imports — AWS SDK n'est chargé que si MESSAGING_PROVIDER=aws
+        const { EventBridgeClient } = await import(
+          '@aws-sdk/client-eventbridge'
+        );
+        const { SNSClient } = await import('@aws-sdk/client-sns');
+
+        this.eventBridgeClient = new EventBridgeClient({
+          region: this.region,
+        });
         this.snsClient = new SNSClient({ region: this.region });
 
         this.logger.log(
@@ -129,7 +133,9 @@ export class EventsService implements OnModuleInit {
         );
       }
     } else {
-      this.logger.log('📡 Events will be published to Redis (dev mode)');
+      this.logger.log(
+        '📡 Events will be published to Redis (MESSAGING_PROVIDER=redis)',
+      );
     }
   }
 
@@ -271,8 +277,8 @@ export class EventsService implements OnModuleInit {
 
   /**
    * Fonction principale d'émission d'événements
-   * - En production: EventBridge
-   * - En développement: Redis Pub/Sub
+   * - MESSAGING_PROVIDER=aws: EventBridge
+   * - MESSAGING_PROVIDER=redis: Redis Pub/Sub
    */
   private async emit(
     eventType: string,
@@ -285,7 +291,7 @@ export class EventsService implements OnModuleInit {
       ...payload,
     };
 
-    if (this.isProduction && this.eventBridgeClient) {
+    if (this.useAws && this.eventBridgeClient) {
       await this.emitToEventBridge(eventType, event, source);
     } else {
       await this.emitToRedis(eventType, event);
@@ -306,6 +312,9 @@ export class EventsService implements OnModuleInit {
     }
 
     try {
+      const { PutEventsCommand } = await import(
+        '@aws-sdk/client-eventbridge'
+      );
       const command = new PutEventsCommand({
         Entries: [
           {
@@ -377,7 +386,7 @@ export class EventsService implements OnModuleInit {
     eventType: string,
     payload: EventPayload,
   ): Promise<void> {
-    if (!this.isProduction || !this.snsClient || !this.flagTopicArn) {
+    if (!this.useAws || !this.snsClient || !this.flagTopicArn) {
       return;
     }
 
@@ -388,6 +397,7 @@ export class EventsService implements OnModuleInit {
         ...payload,
       };
 
+      const { PublishCommand } = await import('@aws-sdk/client-sns');
       const command = new PublishCommand({
         TopicArn: this.flagTopicArn,
         Message: JSON.stringify(message),
@@ -444,7 +454,7 @@ export class EventsService implements OnModuleInit {
   async emitBatch(
     events: Array<{ type: string; payload: EventPayload; source?: string }>,
   ): Promise<void> {
-    if (!this.isProduction || !this.eventBridgeClient) {
+    if (!this.useAws || !this.eventBridgeClient) {
       // En dev, émettre un par un vers Redis
       for (const event of events) {
         await this.emit(event.type, event.payload, event.source);
@@ -452,7 +462,8 @@ export class EventsService implements OnModuleInit {
       return;
     }
 
-    // En prod, batch vers EventBridge (max 10 par requête)
+    // AWS mode: batch vers EventBridge (max 10 par requête)
+    const { PutEventsCommand } = await import('@aws-sdk/client-eventbridge');
     const batches = this.chunk(events, 10);
 
     for (const batch of batches) {

@@ -30,12 +30,6 @@
 // └─────────────────────────────────────────────────────────────────────────┘
 
 import {
-  SQSClient,
-  ReceiveMessageCommand,
-  DeleteMessageCommand,
-  Message,
-} from '@aws-sdk/client-sqs';
-import {
   Injectable,
   Logger,
   OnModuleInit,
@@ -46,8 +40,6 @@ import { SSEMessageType } from '@repo/shared';
 
 import { CacheService } from '../cache/cache.service';
 import { SSEService } from '../sse/sse.service';
-
-// import type { Message } from "@aws-sdk/client-sqs/dist-types/models/models_0";
 
 // Types d'événements attendus
 interface FlagEvent {
@@ -67,37 +59,39 @@ interface FlagEvent {
 export class EventsConsumer implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(EventsConsumer.name);
 
-  // SQS client (production)
-  private sqsClient?: SQSClient;
+  // SQS client (aws mode)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private sqsClient?: any;
   private sqsQueueUrl?: string;
   private sqsPollingActive = false;
   private sqsPollingInterval: number;
 
   // Mode
-  private isProduction: boolean;
+  private useAws: boolean;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly cache: CacheService,
     private readonly sse: SSEService,
   ) {
-    this.isProduction =
-      this.configService.get<string>('nodeEnv') === 'production';
+    this.useAws =
+      this.configService.get<string>('messaging.provider') === 'aws';
     this.sqsQueueUrl = this.configService.get<string>('messaging.readQueueUrl');
     this.sqsPollingInterval =
       this.configService.get<number>('messaging.sqsPollingInterval') || 1000;
   }
 
-  onModuleInit() {
-    if (this.isProduction && this.sqsQueueUrl) {
-      // Production: Utiliser SQS
+  async onModuleInit() {
+    if (this.useAws && this.sqsQueueUrl) {
+      // AWS mode: Dynamic import — SQS SDK chargé uniquement si nécessaire
+      const { SQSClient } = await import('@aws-sdk/client-sqs');
       const region =
         this.configService.get<string>('aws.region') || 'us-east-1';
       this.sqsClient = new SQSClient({ region });
       this.startSQSPolling();
       this.logger.log(`Events consumer initialized (SQS: ${this.sqsQueueUrl})`);
     } else {
-      // Développement: Redis Pub/Sub est géré par CacheService
+      // Redis mode: Pub/Sub est géré par CacheService
       // Rien à faire ici, les événements arrivent via CacheService.handleInvalidationMessage()
       this.logger.log(
         'Events consumer initialized (Redis Pub/Sub via CacheService)',
@@ -131,6 +125,7 @@ export class EventsConsumer implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
+      const { ReceiveMessageCommand } = await import('@aws-sdk/client-sqs');
       const command = new ReceiveMessageCommand({
         QueueUrl: this.sqsQueueUrl,
         MaxNumberOfMessages: 10,
@@ -158,7 +153,8 @@ export class EventsConsumer implements OnModuleInit, OnModuleDestroy {
   /**
    * Traite un batch de messages SQS
    */
-  private async processMessages(messages: Message[]): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async processMessages(messages: any[]): Promise<void> {
     for (const message of messages) {
       try {
         // Parser le message SNS > SQS
@@ -188,6 +184,7 @@ export class EventsConsumer implements OnModuleInit, OnModuleDestroy {
     if (!this.sqsClient || !this.sqsQueueUrl) return;
 
     try {
+      const { DeleteMessageCommand } = await import('@aws-sdk/client-sqs');
       await this.sqsClient.send(
         new DeleteMessageCommand({
           QueueUrl: this.sqsQueueUrl,
@@ -355,7 +352,7 @@ export class EventsConsumer implements OnModuleInit, OnModuleDestroy {
    */
   getStats() {
     return {
-      mode: this.isProduction ? 'SQS' : 'Redis',
+      mode: this.useAws ? 'SQS' : 'Redis',
       sqsQueueUrl: this.sqsQueueUrl || 'N/A',
       sqsPollingActive: this.sqsPollingActive,
     };

@@ -34,7 +34,8 @@ export default () => ({
   // Variables ECS: READ_QUEUE_URL
   // ==========================================================================
   messaging: {
-    // SQS queue pour recevoir les événements de api-management (production)
+    provider: (process.env.MESSAGING_PROVIDER || 'redis') as 'redis' | 'aws',
+    // SQS queue pour recevoir les événements de api-management (aws mode)
     readQueueUrl: process.env.READ_QUEUE_URL,
     // Polling interval pour SQS (ms)
     sqsPollingInterval: parseInt(
@@ -110,7 +111,7 @@ export interface AppConfig {
   port: number;
   database: { url: string };
   redis: { host: string; port: number; password?: string; tls: boolean };
-  messaging: { readQueueUrl?: string; sqsPollingInterval: number };
+  messaging: { provider: 'redis' | 'aws'; readQueueUrl?: string; sqsPollingInterval: number };
   aws: { region: string };
   cache: { ttlSeconds: number; maxLocalItems: number; localTtlMs: number };
   sse: { heartbeatIntervalMs: number; maxConnectionsPerProject: number };

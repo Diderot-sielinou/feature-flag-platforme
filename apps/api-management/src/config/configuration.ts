@@ -59,6 +59,7 @@ export default () => ({
   // Variables ECS: EVENT_BUS_NAME, FLAG_TOPIC_ARN, READ_QUEUE_URL
   // ==========================================================================
   messaging: {
+    provider: (process.env.MESSAGING_PROVIDER || 'redis') as 'redis' | 'aws',
     eventBusName: process.env.EVENT_BUS_NAME || 'feature-flags-bus',
     flagTopicArn: process.env.FLAG_TOPIC_ARN,
     readQueueUrl: process.env.READ_QUEUE_URL,
@@ -152,6 +153,7 @@ export interface AppConfig {
     issuer?: string;
   };
   messaging: {
+    provider: 'redis' | 'aws';
     eventBusName: string;
     flagTopicArn?: string;
     readQueueUrl?: string;

@@ -79,18 +79,19 @@ export class AuthService {
       });
 
       if (user) {
-        // Update with external ID
+        // Update with external ID — Clerk users have verified emails
         user = await this.prisma.user.update({
           where: { id: user.id },
-          data: { externalId, name: name || user.name },
+          data: { externalId, name: name || user.name, emailVerified: true },
         });
       } else {
-        // Create new user
+        // Create new user — Clerk users have verified emails
         user = await this.prisma.user.create({
           data: {
             externalId,
             email,
             name,
+            emailVerified: true,
           },
         });
         this.logger.log(`Created new user: ${email}`);

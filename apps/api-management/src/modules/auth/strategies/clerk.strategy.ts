@@ -32,29 +32,25 @@ export class ClerkStrategy extends PassportStrategy(Strategy, 'clerk') {
   ) {
     const clerkIssuer = configService.get<string>('clerk.issuer');
 
-    if (!clerkIssuer) {
-      // Clerk not configured — strategy won't be used, but Passport requires valid config
-      super({
-        jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-        secretOrKey: 'clerk-not-configured',
-      });
-      return;
-    }
+    const options = clerkIssuer
+      ? {
+          jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+          ignoreExpiration: false,
+          issuer: clerkIssuer,
+          algorithms: ['RS256'] as const,
+          secretOrKeyProvider: passportJwtSecret({
+            cache: true,
+            rateLimit: true,
+            jwksRequestsPerMinute: 10,
+            jwksUri: `${clerkIssuer}/.well-known/jwks.json`,
+          }),
+        }
+      : {
+          jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+          secretOrKey: 'clerk-not-configured',
+        };
 
-    const jwksUri = `${clerkIssuer}/.well-known/jwks.json`;
-
-    super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      ignoreExpiration: false,
-      issuer: clerkIssuer,
-      algorithms: ['RS256'],
-      secretOrKeyProvider: passportJwtSecret({
-        cache: true,
-        rateLimit: true,
-        jwksRequestsPerMinute: 10,
-        jwksUri,
-      }),
-    });
+    super(options);
   }
 
   async validate(payload: ClerkJwtPayload): Promise<AuthenticatedUser> {

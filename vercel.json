@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "npm install",
+  "buildCommand": "npx turbo run build --filter=dashboard",
+  "outputDirectory": "apps/dashboard/.next",
+  "rootDirectory": ".",
+  "ignoreCommand": "npx turbo-ignore --fallback=HEAD~1 --filter=dashboard"
+}

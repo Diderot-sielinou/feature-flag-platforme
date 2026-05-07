@@ -1,5 +1,10 @@
 version: '3.8'
 
+# =============================================================================
+# Docker Compose — Development
+# Usage: cd docker && docker compose up
+# =============================================================================
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -9,7 +14,6 @@ services:
       POSTGRES_PASSWORD: ffpassword
       POSTGRES_DB: featureflags
     ports:
-      # CHANGEMENT: Expose le port interne 5432 sur le port 5433 de l'hôte
       - '5433:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -25,7 +29,6 @@ services:
     image: redis:7-alpine
     container_name: ff-redis
     ports:
-      # CHANGEMENT: Expose le port interne 6379 sur le port 6380 de l'hôte
       - '6380:6379'
     command: redis-server --appendonly yes
     volumes:
@@ -50,7 +53,6 @@ services:
     networks:
       - ff-network
 
-  # API Management (local build)
   api-management:
     build:
       context: ..
@@ -61,14 +63,16 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3000
-      # IMPORTANT: La connexion entre conteneurs utilise toujours les noms de service internes ('postgres:5432')
       DATABASE_URL: postgresql://ffuser:ffpassword@postgres:5432/featureflags?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID}
-      COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID}
-      AWS_REGION: ${AWS_REGION:-us-east-1}
+      MESSAGING_PROVIDER: redis
+      EMAIL_PROVIDER: resend
       JWT_SECRET: dev-secret-change-in-production
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
+      CLERK_ISSUER_URL: ${CLERK_ISSUER_URL:-}
+      CLERK_WEBHOOK_SECRET: ${CLERK_WEBHOOK_SECRET:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,7 +82,6 @@ services:
       - ff-network
     restart: unless-stopped
 
-  # API Read (local build)
   api-read:
     build:
       context: ..
@@ -92,16 +95,13 @@ services:
       DATABASE_URL: postgresql://ffuser:ffpassword@postgres:5432/featureflags?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      AWS_REGION: ${AWS_REGION:-us-east-1}
+      MESSAGING_PROVIDER: redis
     depends_on:
       redis:
         condition: service_healthy
     networks:
       - ff-network
     restart: unless-stopped
-    # Optionnel pour tester le load balancing local
-    # deploy:
-    #   replicas: 2
 
 volumes:
   postgres_data:

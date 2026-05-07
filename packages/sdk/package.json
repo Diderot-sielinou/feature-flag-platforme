@@ -1,15 +1,43 @@
 {
-  "name": "@repo/sdk",
-  "version": "1.0.0",
+  "name": "@launchlayer/sdk",
+  "version": "0.1.0",
+  "description": "LaunchLayer Feature Flag SDK — zero-dependency client with real-time SSE updates",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "feature-flags",
+    "feature-toggle",
+    "launchlayer",
+    "sdk",
+    "a-b-testing"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fonou-diderot/feature-flags-platform",
+    "directory": "packages/sdk"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
     "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

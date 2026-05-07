@@ -126,6 +126,21 @@ export class AuthService {
     };
   }
 
+  async getUserByExternalId(externalId: string): Promise<AuthenticatedUser | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { externalId },
+    });
+
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      externalId: user.externalId,
+      email: user.email,
+      name: user.name || undefined,
+    };
+  }
+
   async getUserByEmail(email: string): Promise<AuthenticatedUser | null> {
     const user = await this.prisma.user.findUnique({
       where: { email },

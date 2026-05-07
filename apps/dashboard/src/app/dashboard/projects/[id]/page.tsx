@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -11,9 +11,7 @@ import {
   Flag,
   Users,
   Key,
-  BarChart3,
   Globe,
-  Pencil,
   Trash2,
   Plus,
   ChevronRight,
@@ -26,49 +24,41 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/toast';
 import { ConfirmDialog } from '@/components/shared';
-import { cn, formatRelativeTime, copyToClipboard, getInitials } from '@/lib/utils';
-
-// Mock project data
-const mockProject = {
-  id: '1',
-  name: 'E-commerce Platform',
-  slug: 'ecommerce-platform',
-  description: 'Main e-commerce application with feature flags for checkout, payments, and user experience improvements.',
-  createdAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
-  updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-  environments: [
-    { id: 'dev', name: 'Development', slug: 'development', color: '#22c55e' },
-    { id: 'staging', name: 'Staging', slug: 'staging', color: '#f59e0b' },
-    { id: 'prod', name: 'Production', slug: 'production', color: '#ef4444' },
-  ],
-  stats: {
-    flags: 24,
-    segments: 8,
-    members: 6,
-    apiKeys: 4,
-  },
-  members: [
-    { id: '1', fullName: 'John Doe', email: 'john@example.com', role: 'OWNER', avatarUrl: null },
-    { id: '2', fullName: 'Sarah Chen', email: 'sarah@example.com', role: 'ADMIN', avatarUrl: null },
-    { id: '3', fullName: 'Mike Johnson', email: 'mike@example.com', role: 'EDITOR', avatarUrl: null },
-  ],
-  recentFlags: [
-    { id: '1', name: 'Dark Mode', key: 'dark-mode', enabled: true },
-    { id: '2', name: 'New Checkout', key: 'new-checkout', enabled: true },
-    { id: '3', name: 'Beta Features', key: 'beta-features', enabled: false },
-  ],
-};
+import { cn, formatRelativeTime, copyToClipboard, getInitials, getEnvironmentColor, getRoleColor } from '@/lib/utils';
+import { useProject, useDeleteProject } from '@/hooks/use-projects';
+import { useFlags } from '@/hooks/use-flags';
+import { useMembers } from '@/hooks/useMembers';
+import { useAppStore } from '@/stores';
 
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const [project] = useState(mockProject);
+  const projectId = params.id as string;
+
+  const { data: project, isLoading: projectLoading } = useProject(projectId);
+  const { data: flagsData } = useFlags(projectId);
+  const { data: membersData } = useMembers(projectId);
+  const deleteProject = useDeleteProject();
+  const setCurrentProject = useAppStore((s) => s.setCurrentProject);
+
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [copiedSlug, setCopiedSlug] = useState(false);
 
+  const flags = flagsData?.data || [];
+  const members = membersData?.data || [];
+
+  // Set as current project when viewing
+  useEffect(() => {
+    if (project) {
+      setCurrentProject(project);
+    }
+  }, [project, setCurrentProject]);
+
   const handleCopySlug = async () => {
+    if (!project) return;
     await copyToClipboard(project.slug);
     setCopiedSlug(true);
     toast.success('Project slug copied');
@@ -76,10 +66,26 @@ export default function ProjectDetailPage() {
   };
 
   const handleDelete = async () => {
-    // API call would go here
+    await deleteProject.mutateAsync(projectId);
     toast.success('Project deleted');
     router.push('/dashboard/projects');
   };
+
+  if (projectLoading) {
+    return <ProjectDetailSkeleton />;
+  }
+
+  if (!project) {
+    return (
+      <div className="text-center py-20">
+        <FolderKanban className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+        <h2 className="text-lg font-medium">Project not found</h2>
+        <Link href="/dashboard/projects">
+          <Button variant="outline" className="mt-4">Back to Projects</Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -124,16 +130,12 @@ export default function ProjectDetailPage() {
                 </button>
               </div>
             </div>
-            <p className="text-muted-foreground max-w-2xl">{project.description}</p>
+            {project.description && (
+              <p className="text-muted-foreground max-w-2xl">{project.description}</p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Link href={`/dashboard/settings`}>
-            <Button variant="outline" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Settings
-            </Button>
-          </Link>
           <Button
             variant="destructive"
             className="gap-2"
@@ -154,21 +156,8 @@ export default function ProjectDetailPage() {
                 <Flag className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{project.stats.flags}</p>
+                <p className="text-2xl font-bold">{project._count?.flags || flags.length}</p>
                 <p className="text-xs text-muted-foreground">Feature Flags</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
-                <Users className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{project.stats.segments}</p>
-                <p className="text-xs text-muted-foreground">Segments</p>
               </div>
             </div>
           </CardContent>
@@ -180,8 +169,21 @@ export default function ProjectDetailPage() {
                 <Users className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{project.stats.members}</p>
+                <p className="text-2xl font-bold">{project._count?.members || members.length}</p>
                 <p className="text-xs text-muted-foreground">Members</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                <Globe className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{project._count?.environments || project.environments?.length || 0}</p>
+                <p className="text-xs text-muted-foreground">Environments</p>
               </div>
             </div>
           </CardContent>
@@ -193,7 +195,7 @@ export default function ProjectDetailPage() {
                 <Key className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{project.stats.apiKeys}</p>
+                <p className="text-2xl font-bold">{project._count?.apiKeys || 0}</p>
                 <p className="text-xs text-muted-foreground">API Keys</p>
               </div>
             </div>
@@ -216,37 +218,38 @@ export default function ProjectDetailPage() {
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>Recent Flags</CardTitle>
+                  <CardTitle>Feature Flags</CardTitle>
                   <Link href="/dashboard/flags">
-                    <Button variant="ghost" size="sm">
-                      View all
-                    </Button>
+                    <Button variant="ghost" size="sm">View all</Button>
                   </Link>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {project.recentFlags.map((flag) => (
-                    <Link
-                      key={flag.id}
-                      href={`/dashboard/flags/${flag.id}`}
-                      className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Flag className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium">{flag.name}</p>
-                          <p className="text-xs text-muted-foreground font-mono">
-                            {flag.key}
-                          </p>
+                {flags.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No flags yet. Create your first flag to get started.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {flags.slice(0, 5).map((flag) => (
+                      <div
+                        key={flag.id}
+                        className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Flag className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">{flag.name}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{flag.key}</p>
+                          </div>
                         </div>
+                        <Badge variant={flag.enabled ? 'success' : 'secondary'}>
+                          {flag.enabled ? 'On' : 'Off'}
+                        </Badge>
                       </div>
-                      <Badge variant={flag.enabled ? 'success' : 'secondary'}>
-                        {flag.enabled ? 'On' : 'Off'}
-                      </Badge>
-                    </Link>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -257,22 +260,16 @@ export default function ProjectDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3">
-                  <Link href="/dashboard/flags/new">
+                  <Link href="/dashboard/flags">
                     <Button variant="outline" className="w-full justify-start gap-2">
-                      <Plus className="h-4 w-4" />
-                      Create Feature Flag
+                      <Flag className="h-4 w-4" />
+                      Manage Feature Flags
                     </Button>
                   </Link>
-                  <Link href="/dashboard/segments/new">
+                  <Link href="/dashboard/api-keys">
                     <Button variant="outline" className="w-full justify-start gap-2">
-                      <Plus className="h-4 w-4" />
-                      Create Segment
-                    </Button>
-                  </Link>
-                  <Link href="/dashboard/api-keys/new">
-                    <Button variant="outline" className="w-full justify-start gap-2">
-                      <Plus className="h-4 w-4" />
-                      Generate API Key
+                      <Key className="h-4 w-4" />
+                      Manage API Keys
                     </Button>
                   </Link>
                   <Link href="/dashboard/members">
@@ -319,42 +316,33 @@ export default function ProjectDetailPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Environments</CardTitle>
-                  <CardDescription>
-                    Manage deployment environments for this project
-                  </CardDescription>
+                  <CardDescription>Deployment environments for this project</CardDescription>
                 </div>
-                <Button variant="outline" className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Add Environment
-                </Button>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {project.environments.map((env) => (
+                {(project.environments || []).map((env: { id: string; name: string; slug: string }) => (
                   <div
                     key={env.id}
                     className="flex items-center justify-between p-4 rounded-lg border border-border"
                   >
                     <div className="flex items-center gap-4">
-                      <div
-                        className="h-10 w-10 rounded-lg flex items-center justify-center"
-                        style={{ backgroundColor: `${env.color}20` }}
-                      >
-                        <Globe className="h-5 w-5" style={{ color: env.color }} />
+                      <div className={cn('h-10 w-10 rounded-lg flex items-center justify-center', getEnvironmentColor(env.slug))}>
+                        <Globe className="h-5 w-5" />
                       </div>
                       <div>
                         <p className="font-medium">{env.name}</p>
-                        <p className="text-sm text-muted-foreground font-mono">
-                          {env.slug}
-                        </p>
+                        <p className="text-sm text-muted-foreground font-mono">{env.slug}</p>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm">
-                      Configure
-                    </Button>
                   </div>
                 ))}
+                {(!project.environments || project.environments.length === 0) && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No environments configured.
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -367,9 +355,7 @@ export default function ProjectDetailPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Team Members</CardTitle>
-                  <CardDescription>
-                    People with access to this project
-                  </CardDescription>
+                  <CardDescription>People with access to this project</CardDescription>
                 </div>
                 <Link href="/dashboard/members">
                   <Button variant="outline" className="gap-2">
@@ -381,54 +367,73 @@ export default function ProjectDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {project.members.map((member) => (
+                {members.map((member) => (
                   <div
                     key={member.id}
                     className="flex items-center justify-between p-4 rounded-lg border border-border"
                   >
                     <div className="flex items-center gap-4">
                       <Avatar>
-                        <AvatarImage src={member.avatarUrl || undefined} />
+                        <AvatarImage src={member.user?.avatarUrl || undefined} />
                         <AvatarFallback>
-                          {getInitials(member.fullName)}
+                          {getInitials(member.user?.fullName || member.user?.email || '?')}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium">{member.fullName}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {member.email}
-                        </p>
+                        <p className="font-medium">{member.user?.fullName || 'Unknown'}</p>
+                        <p className="text-sm text-muted-foreground">{member.user?.email}</p>
                       </div>
                     </div>
-                    <Badge
-                      variant={
-                        member.role === 'OWNER'
-                          ? 'default'
-                          : member.role === 'ADMIN'
-                          ? 'secondary'
-                          : 'outline'
-                      }
-                    >
+                    <Badge className={getRoleColor(member.role)}>
                       {member.role}
                     </Badge>
                   </div>
                 ))}
+                {members.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No members yet.
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Confirmation */}
       <ConfirmDialog
         open={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
         title="Delete Project"
-        description="Are you sure you want to delete this project? This action cannot be undone and will permanently delete all flags, segments, and data associated with this project."
+        description="Are you sure you want to delete this project? This action cannot be undone and will permanently delete all flags, segments, and data."
         confirmLabel="Delete Project"
         variant="destructive"
         onConfirm={handleDelete}
       />
     </motion.div>
+  );
+}
+
+function ProjectDetailSkeleton() {
+  return (
+    <div className="space-y-6">
+      <Skeleton className="h-5 w-48" />
+      <div className="flex items-start gap-4">
+        <Skeleton className="h-12 w-12 rounded-xl" />
+        <div>
+          <Skeleton className="h-9 w-64" />
+          <Skeleton className="h-4 w-32 mt-2" />
+        </div>
+      </div>
+      <div className="grid gap-4 md:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <Card key={i}>
+            <CardContent className="p-4">
+              <Skeleton className="h-16 w-full" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
   );
 }

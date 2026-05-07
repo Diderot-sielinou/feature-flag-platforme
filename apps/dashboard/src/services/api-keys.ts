@@ -1,28 +1,21 @@
-import { apiClient } from './api-client';
+import apiClient, { endpoints } from './api-client';
 import type { ApiKey, PaginatedResponse, PaginationParams } from '@/types';
 
 export interface CreateApiKeyInput {
   name: string;
-  type: 'SDK' | 'SERVER';
   environmentId: string;
-  permissions?: {
-    read: boolean;
-    write: boolean;
-    admin: boolean;
-  };
-  expiresAt?: string;
 }
 
 export interface ApiKeyWithSecret extends ApiKey {
-  key: string; // Only returned on creation
+  key: string;
 }
 
 export const apiKeysService = {
   async list(
     projectId: string,
-    params?: PaginationParams
+    params?: PaginationParams,
   ): Promise<PaginatedResponse<ApiKey>> {
-    const response = await apiClient.get(`/projects/${projectId}/api-keys`, {
+    const response = await apiClient.get(endpoints.apiKeys.list(projectId), {
       params,
     });
     return response.data;
@@ -30,36 +23,32 @@ export const apiKeysService = {
 
   async get(projectId: string, keyId: string): Promise<ApiKey> {
     const response = await apiClient.get(
-      `/projects/${projectId}/api-keys/${keyId}`
+      endpoints.apiKeys.get(projectId, keyId),
     );
     return response.data;
   },
 
   async create(
     projectId: string,
-    data: CreateApiKeyInput
+    data: CreateApiKeyInput,
   ): Promise<ApiKeyWithSecret> {
     const response = await apiClient.post(
-      `/projects/${projectId}/api-keys`,
-      data
+      endpoints.apiKeys.create(projectId),
+      data,
     );
     return response.data;
   },
 
   async revoke(projectId: string, keyId: string): Promise<void> {
-    await apiClient.post(`/projects/${projectId}/api-keys/${keyId}/revoke`);
+    await apiClient.post(endpoints.apiKeys.revoke(projectId, keyId));
   },
 
-  async delete(projectId: string, keyId: string): Promise<void> {
-    await apiClient.delete(`/projects/${projectId}/api-keys/${keyId}`);
-  },
-
-  async regenerate(
+  async rotate(
     projectId: string,
-    keyId: string
+    keyId: string,
   ): Promise<ApiKeyWithSecret> {
     const response = await apiClient.post(
-      `/projects/${projectId}/api-keys/${keyId}/regenerate`
+      endpoints.apiKeys.rotate(projectId, keyId),
     );
     return response.data;
   },

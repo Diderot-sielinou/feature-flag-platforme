@@ -13,7 +13,6 @@
 
 # Documentation
 *.md
-README.md
 docs/
 
 # IDE
@@ -27,68 +26,16 @@ docs/
 **/*.test.ts
 **/*.spec.ts
 **/test/
+**/tests/
 coverage/
 .nyc_output/
 
-# Build artifacts (on les rebuild dans Docker)
+# Build artifacts (rebuilt inside Docker)
 **/dist/
 **/.turbo/
-.next/
+**/.next/
 
-# Environment files (gérés séparément)
-.env.local
-.env.*.local
-.env.development
-.env.test
-
-# Logs
-*.log
-logs/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Docker
-docker-compose.yml
-docker/
-Dockerfile*
-
-# Autres
-.husky/
-.turbo/
-.cache/
-tmp/
-temp/
-
-# Scripts
-scripts
-*.sh
-
-# Dependencies - IMPORTANT: exclure tous les node_modules
-node_modules
-**/node_modules
-.pnpm-store
-
-# Build outputs
-**/dist
-**/.next
-**/.turbo
-
-# Git
-.git
-.gitignore
-
-# IDE
-.idea
-.vscode
-*.swp
-*.swo
-
-# Environment files (sensibles)
+# Environment files (injected at runtime)
 .env
 .env.*
 !.env.example
@@ -99,20 +46,29 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Test & Coverage
-coverage
-.nyc_output
-**/*.spec.ts
-**/*.test.ts
-**/test
-**/tests
+# OS
+.DS_Store
+Thumbs.db
 
-# Docker (éviter récursion)
+# Docker (avoid recursion)
 docker-compose*.yml
 Dockerfile*
 .docker
 
-# Documentation
-*.md
-!README.md
-docs
+# Hooks & caches
+.husky/
+.turbo/
+.cache/
+tmp/
+temp/
+
+# Dependencies (rebuilt in Docker)
+node_modules
+**/node_modules
+.pnpm-store
+
+# Infrastructure (not needed in app images)
+infrastructure/
+
+# Keep migrate.sh (needed for DB migrations in container)
+!packages/database/migrate.sh

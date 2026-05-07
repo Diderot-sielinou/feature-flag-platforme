@@ -72,11 +72,11 @@ export class ClerkStrategy extends PassportStrategy(Strategy, 'clerk') {
       undefined;
 
     if (email) {
-      return this.authService.getOrCreateUser(clerkUserId, email, name);
+      return await this.authService.getOrCreateUser(clerkUserId, email, name);
     }
 
     // If email not in token, look up user by externalId
-    const user = await this.authService.getUserById(clerkUserId);
+    const user = await this.authService.getUserByExternalId(clerkUserId);
     if (!user) {
       // User not yet synced — this can happen if webhook hasn't fired yet
       throw new UnauthorizedException(

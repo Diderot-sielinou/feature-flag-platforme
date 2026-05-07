@@ -1,83 +1,43 @@
-import apiClient, { API_ENDPOINTS } from './api-client';
-import type { Schedule, PaginatedResponse, PaginationParams } from '@/types';
+import apiClient, { endpoints } from './api-client';
+import type { PaginatedResponse, PaginationParams } from '@/types';
 
-export interface CreateScheduleInput {
-  projectId: string;
+export interface Schedule {
+  id: string;
   flagId: string;
   environmentId: string;
-  name: string;
-  description?: string;
-  action: 'ENABLE' | 'DISABLE' | 'UPDATE_VALUE' | 'UPDATE_ROLLOUT';
+  action: 'ENABLE' | 'DISABLE';
   scheduledAt: string;
-  value?: any;
-  rolloutPercentage?: number;
+  status: 'PENDING' | 'EXECUTED' | 'CANCELLED';
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface UpdateScheduleInput {
-  name?: string;
-  description?: string;
-  scheduledAt?: string;
-  action?: 'ENABLE' | 'DISABLE' | 'UPDATE_VALUE' | 'UPDATE_ROLLOUT';
-  value?: any;
-  rolloutPercentage?: number;
+export interface CreateScheduleInput {
+  environmentId: string;
+  action: 'ENABLE' | 'DISABLE';
+  scheduledAt: string;
 }
 
 export const schedulesService = {
-  /**
-   * Get all schedules for a project
-   */
-  async list(projectId: string, params?: PaginationParams): Promise<PaginatedResponse<Schedule>> {
-    const response = await apiClient.get(API_ENDPOINTS.schedules.list(projectId), { params });
-    return response.data;
-  },
-
-  /**
-   * Get a single schedule
-   */
-  async get(projectId: string, scheduleId: string): Promise<Schedule> {
-    const response = await apiClient.get(API_ENDPOINTS.schedules.get(projectId, scheduleId));
-    return response.data;
-  },
-
-  /**
-   * Create a new schedule
-   */
-  async create(data: CreateScheduleInput): Promise<Schedule> {
-    const { projectId, ...body } = data;
-    const response = await apiClient.post(API_ENDPOINTS.schedules.create(projectId), body);
-    return response.data;
-  },
-
-  /**
-   * Update a schedule
-   */
-  async update(
+  async list(
     projectId: string,
-    scheduleId: string,
-    data: UpdateScheduleInput
-  ): Promise<Schedule> {
-    const response = await apiClient.patch(
-      API_ENDPOINTS.schedules.update(projectId, scheduleId),
-      data
-    );
+    flagId: string,
+    params?: PaginationParams,
+  ): Promise<PaginatedResponse<Schedule>> {
+    const response = await apiClient.get(endpoints.schedules.list(projectId, flagId), { params });
     return response.data;
   },
 
-  /**
-   * Cancel a schedule
-   */
-  async cancel(projectId: string, scheduleId: string): Promise<Schedule> {
+  async create(projectId: string, flagId: string, data: CreateScheduleInput): Promise<Schedule> {
+    const response = await apiClient.post(endpoints.schedules.create(projectId, flagId), data);
+    return response.data;
+  },
+
+  async cancel(projectId: string, flagId: string, scheduleId: string): Promise<Schedule> {
     const response = await apiClient.post(
-      API_ENDPOINTS.schedules.cancel(projectId, scheduleId)
+      endpoints.schedules.cancel(projectId, flagId, scheduleId),
     );
     return response.data;
-  },
-
-  /**
-   * Delete a schedule
-   */
-  async delete(projectId: string, scheduleId: string): Promise<void> {
-    await apiClient.delete(API_ENDPOINTS.schedules.delete(projectId, scheduleId));
   },
 };
 

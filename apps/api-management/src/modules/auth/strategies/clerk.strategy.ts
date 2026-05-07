@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { passportJwtSecret } from 'jwks-rsa';
-import { Strategy, ExtractJwt } from 'passport-jwt';
+import { Strategy, ExtractJwt, StrategyOptionsWithoutRequest } from 'passport-jwt';
 
 import { AuthService, AuthenticatedUser } from '../auth.service';
 
@@ -32,12 +32,12 @@ export class ClerkStrategy extends PassportStrategy(Strategy, 'clerk') {
   ) {
     const clerkIssuer = configService.get<string>('clerk.issuer');
 
-    const options = clerkIssuer
+    const options: StrategyOptionsWithoutRequest = clerkIssuer
       ? {
           jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
           ignoreExpiration: false,
           issuer: clerkIssuer,
-          algorithms: ['RS256'] as const,
+          algorithms: ['RS256'],
           secretOrKeyProvider: passportJwtSecret({
             cache: true,
             rateLimit: true,

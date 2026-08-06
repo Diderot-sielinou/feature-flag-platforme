@@ -39,6 +39,8 @@ export interface ComputeStackProps extends cdk.StackProps {
 
   // Configuration
   isProduction?: boolean;
+  dashboardUrl?: string;
+  // docsUrl?: string;
 }
 
 /**
@@ -120,7 +122,7 @@ export class ComputeStack extends cdk.Stack {
       targetType: elbv2.TargetType.IP,
       targetGroupName: 'ff-read-tg',
       healthCheck: {
-        path: '/api/v1/eval/health',
+        path: '/api/v1/sse/health',
         interval: cdk.Duration.seconds(60),
         timeout: cdk.Duration.seconds(10),
         healthyThresholdCount: 2,
@@ -388,10 +390,11 @@ export class ComputeStack extends cdk.Stack {
     // Environment Variables
     // ========================================
     const commonEnv = {
-      NODE_ENV: isProduction ? 'production' : 'development',
+      NODE_ENV: isProduction ? 'production' : 'production',
       AWS_REGION: cdk.Aws.REGION,
       REDIS_HOST: props.redisEndpoint,
       REDIS_PORT: '6379',
+      REDIS_TLS: isProduction ? 'true' : 'false',
       COGNITO_USER_POOL_ID: props.userPoolId,
       COGNITO_CLIENT_ID: props.userPoolClientId,
       EVENT_BUS_NAME: props.eventBusName,
@@ -400,6 +403,10 @@ export class ComputeStack extends cdk.Stack {
       // SES Configuration
       SES_SENDER_EMAIL: props.senderEmail,
       SES_CONFIGURATION_SET: 'feature-flags-emails',
+
+      // App URLs (pour les liens dans les emails) - AJOUTER
+      DASHBOARD_URL: props.dashboardUrl || `http://${this.alb.loadBalancerDnsName}`,
+      // DOCS_URL: props.docsUrl || `http://${this.alb.loadBalancerDnsName}/docs`,
     };
 
     const managementEnv = {
@@ -467,7 +474,7 @@ export class ComputeStack extends cdk.Stack {
       },
       portMappings: [{ containerPort: 3001, protocol: ecs.Protocol.TCP }],
       healthCheck: {
-        command: ['CMD-SHELL', 'curl -f http://localhost:3001/api/v1/eval/health || exit 1'],
+        command: ['CMD-SHELL', 'curl -f http://localhost:3001/api/v1/sse/health || exit 1'],
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(5),
         retries: 3,

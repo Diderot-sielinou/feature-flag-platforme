@@ -10,7 +10,6 @@ FROM node:20-alpine AS dependencies
 
 RUN apk add --no-cache openssl libc6-compat
 
-
 WORKDIR /app
 
 # Configuration npm pour réseau instable
@@ -67,13 +66,28 @@ RUN rm -rf /app/apps/api-management/node_modules \
     && rm -rf /app/packages/shared/node_modules \
     && rm -rf /app/packages/typescript-config/node_modules
 
+# ✅ NOUVEAU : Nettoyer TOUS les caches TypeScript avant le build
+RUN find /app -name "tsconfig.tsbuildinfo" -type f -delete && \
+    find /app -name "tsconfig.build.tsbuildinfo" -type f -delete && \
+    echo "🧹 Caches TypeScript nettoyés"
+
 # Générer Prisma Client
 WORKDIR /app/packages/database
 RUN npm run db:generate
 
 # Build via Turbo (optimal pour monorepo)
 WORKDIR /app
-RUN npx turbo run build --filter=api-management
+
+# ✅ Build des packages avec --force pour garantir la génération
+RUN npx turbo run build --filter=./packages/shared --filter=./packages/database --force
+
+# Vérification du contenu de shared/dist
+RUN echo "=== Vérification du contenu de shared/dist ===" && \
+    ls -la /app/packages/shared/dist/ && \
+    test -f /app/packages/shared/dist/index.d.ts || (echo "❌ index.d.ts manquant!" && exit 1)
+
+# ✅ Build de api-management avec --force
+RUN npx turbo run build --filter=api-management --force
 
 # Vérification du build
 RUN echo "✅ Build verification:" && \
@@ -132,7 +146,7 @@ EXPOSE 3000
 
 # Health check optimisé
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:3000/health || exit 1
+  CMD curl -f http://localhost:3000/api/v1/management/health || exit 1
 
 # Utiliser dumb-init pour gérer les signaux correctement
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]

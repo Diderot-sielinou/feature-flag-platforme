@@ -34,8 +34,8 @@ const config = {
   // Email pour les alertes et SES
   alarmEmail: process.env.ALARM_EMAIL || 'diderotsielinou@gmail.com',
 
-  // Mode production ou développement (affecte les ressources)
   isProduction: process.env.NODE_ENV === 'production',
+  dashboardUrl: 'http://localhost:3000',
 
   // Domaine (optionnel - à configurer plus tard)
   domainName: process.env.DOMAIN_NAME,
@@ -136,6 +136,10 @@ const computeStack = new ComputeStack(app, 'FeatureFlagsComputeStack', {
   // Email (SES)
   sesIdentityArn: emailStack.emailIdentityArn,
   senderEmail: config.alarmEmail,
+
+  // App URLs (à configurer quand vous aurez un domaine)
+  dashboardUrl: config.dashboardUrl ? `https://app.${config.domainName}` : undefined,
+  // docsUrl: config.domainName ? `https://docs.${config.domainName}` : undefined,
 
   // Configuration
   isProduction: config.isProduction,

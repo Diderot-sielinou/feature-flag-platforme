@@ -215,6 +215,7 @@ export interface User extends Timestamps {
   email: string;
   firstName?: string;
   lastName?: string;
+  name?: string;
   avatar?: string;
   timezone?: string;
   locale?: string;
